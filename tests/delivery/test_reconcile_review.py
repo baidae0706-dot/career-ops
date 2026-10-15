@@ -167,6 +167,59 @@ class ReconcileReviewTests(unittest.TestCase):
         self.assertIn("unknown", result["reason"])
         self.assertFalse((self.folder / "status.json").exists())
 
+    def initial_status_only(self):
+        self.status.update(stage="preparing")
+        self.status.pop("session_id")
+        self.status.pop("review_model")
+        write(self.folder / "status.json", self.status)
+        for name in ("request.json", "evidence.json", "stream.jsonl", "stderr.log"):
+            (self.folder / name).unlink()
+
+    def test_status_before_request_crash_restores_only_after_lock_and_exit_proof(self):
+        self.initial_status_only()
+        (self.folder / "request.json.tmp").write_text('{"partial":', encoding="utf-8")
+        self.lock_busy = True
+        self.assertEqual(self.call()["reconciliation"], "pending")
+        self.assertFalse((self.folder / "request.json").exists())
+        self.lock_busy = False
+        process = self.add_process(self.status["pid"])
+        self.assertEqual(self.call()["reconciliation"], "pending")
+        self.assertFalse((self.folder / "request.json").exists())
+        (process / "stat").write_text(stat_text(self.status["pid"], state="Z"), encoding="utf-8")
+        self.assertEqual(self.call()["reconciliation"], "sealed")
+        self.assertEqual(read(self.folder / "request.json"), self.request)
+        record = read(self.folder / "reconciliation.json")
+        self.assertTrue(record["original_request_missing"])
+        self.assertEqual(record["preserved_files"], {})
+        self.assertEqual(verify_files(self.folder, read(self.folder / "evidence.json")["files"]), [])
+
+    def test_request_restoration_interruption_keeps_original_missing_evidence(self):
+        self.initial_status_only()
+        original_write = reconcile_review.write
+        crashed = False
+
+        def stop_before_request(path, value):
+            nonlocal crashed
+            if Path(path).resolve() == self.folder / "request.json" and not crashed:
+                crashed = True
+                raise OSError("Injected interruption after recovery record, before request copy")
+            return original_write(path, value)
+
+        with patch("reconcile_review.write", side_effect=stop_before_request):
+            self.assertEqual(self.call()["reconciliation"], "pending")
+        self.assertTrue(crashed)
+        record = (self.folder / "reconciliation.json").read_bytes()
+        self.assertFalse((self.folder / "request.json").exists())
+        self.assertEqual(self.call()["reconciliation"], "sealed")
+        self.assertEqual((self.folder / "reconciliation.json").read_bytes(), record)
+
+    def test_existing_different_request_is_not_repaired(self):
+        different = {**self.request, "pr": 99}
+        write(self.folder / "request.json", different)
+        self.assertEqual(self.call()["reconciliation"], "pending")
+        self.assertEqual(read(self.folder / "request.json"), different)
+        self.assertFalse((self.folder / "reconciliation.json").exists())
+
     def test_recovery_commit_interruption_reuses_original_receipt(self):
         original_write = reconcile_review.write
         crashed = False

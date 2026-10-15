@@ -123,7 +123,7 @@ def file_manifest(folder, excluded=()):
     for path in folder.iterdir():
         # Atomic control-write leftovers are not committed evidence; the writes
         # below consume these exact temporary names before the round is sealed.
-        if path.name in (*excluded, "status.json.tmp", "evidence.json.tmp", "reconciliation.json.tmp"):
+        if path.name in (*excluded, "request.json.tmp", "status.json.tmp", "evidence.json.tmp", "reconciliation.json.tmp"):
             continue
         if path.is_symlink() or not path.is_file():
             raise Unverified("Unexpected non-file review artifact")
@@ -143,14 +143,17 @@ def original_identity(config, run, incoming, folder):
         raise Unverified("Original uploaded evidence changed")
     request = read(incoming / "request.json")
     validate_request(request, config)
-    if run_id(request) != run or read(folder / "request.json") != request:
+    request_path = folder / "request.json"
+    request_missing = not request_path.exists()
+    if (run_id(request) != run or request_path.is_symlink()
+            or not request_missing and read(request_path) != request):
         raise Unverified("Run does not match its original request")
     if read(incoming / "local-evidence.json").get("request_digest") != digest(request):
         raise Unverified("Original local evidence belongs to another request")
     status = read(folder / "status.json")
     if status.get("run_id") != run or status.get("request_digest") != digest(request):
         raise Unverified("Worker status belongs to another request")
-    return request, status, manifest
+    return request, status, manifest, request_missing
 
 
 def resolve_cleanup(root, run, marker, status, proof):
@@ -188,12 +191,14 @@ def reconcile(config, run):
             raise Unverified("Original review directories must not be symbolic links")
         if not (folder / "status.json").exists():
             raise Unverified("Original worker status is absent; launch history remains unknown")
-        request, status, manifest = original_identity(config, run, incoming, folder)
+        request, status, manifest, request_missing = original_identity(config, run, incoming, folder)
         pending["stage"] = status.get("stage", "unverified")
         marker_path = root / "cleanup-blocked.json"
         marker = read(marker_path) if marker_path.exists() else None
         if marker is not None and marker.get("run_id") != run:
             raise Unverified("Another run owns the unresolved cleanup block")
+        if status.get("stage") in ("completed", "error") and request_missing:
+            raise Unverified("Terminal review request is missing; preserve the sealed round")
         if status.get("stage") in ("completed", "error") and marker is None:
             return {**status, "reconciliation": "already-terminal"}
         if (not isinstance(status.get("boot_id"), str) or not status["boot_id"]
@@ -203,9 +208,11 @@ def reconcile(config, run):
             raise Unverified("Original boot, user or lock identity was not recorded")
         with original_worker_lock(root / "worker.lock", status["worker_lock"]):
             # The initial read can race a live worker finishing before we lock.
-            request, status, manifest = original_identity(config, run, incoming, folder)
+            request, status, manifest, request_missing = original_identity(config, run, incoming, folder)
             proof = process_evidence(status, folder, incoming)
             if status.get("stage") in ("completed", "error"):
+                if request_missing:
+                    raise Unverified("Terminal review request is missing; preserve the sealed round")
                 resolve_cleanup(root, run, marker, status, proof)
                 return {**status, "reconciliation": "cleanup-reconciled" if marker else "already-terminal"}
             record_path = folder / "reconciliation.json"
@@ -214,7 +221,9 @@ def reconcile(config, run):
                 if (record.get("run_id") != run or record.get("request_digest") != digest(request)
                         or record.get("original_status") != status
                         or record.get("upload_manifest") != manifest
-                        or verify_files(folder, record.get("preserved_files"))):
+                        or not isinstance(record.get("preserved_files"), dict)
+                        or not record["preserved_files"] and record.get("original_request_missing") is not True
+                        or record["preserved_files"] and verify_files(folder, record["preserved_files"])):
                     raise Unverified("Existing recovery record belongs to different or changed evidence")
             else:
                 evidence_path = folder / "evidence.json"
@@ -225,10 +234,17 @@ def reconcile(config, run):
                     raise Unverified("Original review artifact manifest changed")
                 record = dict(run_id=run, request_digest=digest(request), upload_manifest=manifest,
                     original_status=status, original_evidence=evidence, process_evidence=proof,
+                    original_request_missing=request_missing,
                     preserved_files=file_manifest(folder, ("status.json", "evidence.json")),
                     observed_at=time.time(), verdict="INSUFFICIENT",
                     reason="Original worker stopped without a terminal review outcome; startup history is not inferred")
                 write(record_path, record)
+            if request_missing:
+                if not record.get("original_request_missing"):
+                    raise Unverified("Request disappeared after recovery began; preserve the evidence")
+                # This copy is justified by the pinned upload and status digest,
+                # only after exclusive-lock and stopped-process verification.
+                write(folder / "request.json", request)
             evidence = {**record["original_evidence"], "request_digest": digest(request),
                         "reconciliation": "reconciliation.json"}
             if status.get("session_id"):
