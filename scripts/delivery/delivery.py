@@ -220,6 +220,13 @@ def collect(config, run, folder):
     print(json.dumps(dict(directory=str(folder), run_id=run)))
 
 
+def reconcile(config, run):
+    prefix = f"import sys,json;sys.path.insert(0,{config['remote_root'] + '/tools'!r});import reconcile_review as r\n"
+    result = json.loads(remote(config, prefix + f"print(json.dumps(r.reconcile({config!r},{run!r})))"))
+    print(json.dumps(result))
+    return result
+
+
 def premerge(config, folder):
     request, report, evidence, state = [read(folder / n) for n in
                                       ("request.json", "report.json", "evidence.json", "status.json")]
@@ -257,7 +264,7 @@ def main():
     p.add_argument("--out", type=Path, required=True)
     for name in ("dispatch", "premerge"):
         commands.add_parser(name).add_argument("folder", type=Path)
-    for name in ("status", "collect"):
+    for name in ("status", "collect", "reconcile"):
         p = commands.add_parser(name)
         p.add_argument("run")
         if name == "collect":
@@ -276,6 +283,8 @@ def main():
         premerge(config, args.folder.resolve())
     elif args.command == "collect":
         collect(config, args.run, args.out.resolve())
+    elif args.command == "reconcile":
+        reconcile(config, args.run)
 
 
 if __name__ == "__main__":

@@ -52,7 +52,9 @@ facts, or changing reference projects. Product confirmations remain required.
 9. If a substantive dispute remains, register a Fable request for the same
    candidate with `--escalation-reason`. Opus and Fable keep separate sessions.
    An invoked Fable must also pass the eventual candidate, and Opus remains the
-   final required review. Resume each model's original session after repair.
+   final required review. Both receipts must bind the same criteria, check
+   commands, Issue and parent specification snapshots, as well as the candidate.
+   Resume each model's original session after repair.
 10. Record Codex's acceptance with `accept`; it binds every criterion and finding
     to the exact Opus request. `next` reaches `merge` only after both accept and
     any invoked Fable passes. Use `coordinator.py merge --issue N`; it rechecks
@@ -91,7 +93,12 @@ The VPS worker lock is inherited by checks and model processes, so a dead parent
 does not permit a competing reviewer while its children remain alive.
 
 For `reconcile`, inspect the recorded operation. A review resumes the same run ID;
-a merge reruns `merge --issue N`, which reads actual PR/merge/comment/closure
+`delivery.py reconcile RUN` can seal an interrupted round only after acquiring
+its original worker lock and proving the recorded worker/model processes and
+related log holders have stopped. It preserves raw evidence and session identity,
+then records `INSUFFICIENT` for collection and a new review round. A busy lock,
+unknown process identity or uncertain launch remains pending, never relaunched.
+A merge reruns `merge --issue N`, which reads actual PR/merge/comment/closure
 state. The finish journal lives beside the immutable review receipt. A provably
 unsubmitted or explicitly rejected single-request mutation can retry normally.
 For an unknown merge or closure, use `merge --issue N --reconcile-operation merge`
@@ -124,6 +131,8 @@ the external command boundary, never real merges. Process timeout and lock tests
 use real OS behavior; the Linux lock test explicitly skips on Windows. A sandbox
 that blocks Windows `taskkill` cannot supply Windows process-tree acceptance;
 run that check with the authorized task's own process permissions and record it.
+Keep this required delivery check separate from the Node-only core suite;
+`node test-all.mjs` does not discover or replace the Python protocol tests.
 
 This tooling derives from the OhMyShuttle delivery protocol and adds Career Ops
 queue state, dispatch recovery and verified completion. Source is reused; reviews,

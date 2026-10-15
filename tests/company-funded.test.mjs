@@ -1,7 +1,6 @@
 import { pass, fail, ROOT } from './helpers.mjs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
-import { mock } from 'node:test';
 
 console.log('\nUtility - company-funded');
 
@@ -342,7 +341,7 @@ try {
         <item>
           <title>Acme raises $25M Series A</title>
           <link>https://techcrunch.com/acme</link>
-          <pubDate>Wed, 15 Jul 2026 12:00:00 +0000</pubDate>
+          <pubDate>${new Date(Date.now() - 24 * 60 * 60 * 1000).toUTCString()}</pubDate>
           <description>Acme raises funding.</description>
         </item>
       </channel></rss>`, {
@@ -353,9 +352,6 @@ try {
     return res;
   };
   try {
-    // This redirect check has a fixed July fixture; date-window behavior is
-    // asserted separately above. Keep the external clock equally fixed.
-    mock.timers.enable({ apis: ['Date'], now: new Date('2026-07-20T00:00:00Z') });
     const result = await mod.discoverFundedCompanies({
       dryRun: true,
       sources: ['techcrunch'],
@@ -373,7 +369,6 @@ try {
       fail(`structured fetch behavior wrong: ${JSON.stringify({ result, seenFetchOptions })}`);
     }
   } finally {
-    mock.timers.reset();
     globalThis.fetch = originalFetch;
   }
 

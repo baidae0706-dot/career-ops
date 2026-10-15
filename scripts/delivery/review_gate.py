@@ -34,6 +34,21 @@ def spec_digest(value):
     return digest({k: value.get(k) for k in ("title", "body", "comments")})
 
 
+def review_contract(request):
+    """Model and attempt selection do not change the work being reviewed."""
+    return {key: value for key, value in request.items()
+            if key not in ("round", "review_model", "expected_model")}
+
+
+def review_context_digest(request, evidence):
+    specifications = {"issue_digest": evidence.get("issue_digest"),
+                      "parent_digest": evidence.get("parent_digest") if request.get("parent_issue") else None}
+    required = ("issue_digest", "parent_digest") if request.get("parent_issue") else ("issue_digest",)
+    if any(not isinstance(specifications[key], str) or not re.fullmatch(r"[a-f0-9]{64}", specifications[key]) for key in required):
+        raise ValueError("Actual Issue and parent specification digests are required for acceptance")
+    return digest(dict(request=review_contract(request), **specifications))
+
+
 def validate_request(request, config):
     model = review_model(request)
     if request.get("expected_model") != config.get("actual_models", {}).get(model) or not request.get("expected_model"):

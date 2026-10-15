@@ -110,19 +110,21 @@ class CoordinatorTests(unittest.TestCase):
         self.run_cli("candidate", path, "--checkout", checkout, "--owner", "codex-thread", success=False)
         self.run_cli("intent", "--kind", "review", "--operation", "review-2", success=False)
 
-    def review_receipt(self, request, verdict="PASS", session="opus-session"):
+    def review_receipt(self, request, verdict="PASS", session="opus-session", issue_digest="a" * 64):
         folder = self.root / f"receipt-{request['round']}"
         folder.mkdir()
         report = {k: request[k] for k in IDENTITY}
         report.update(verdict=verdict, standards=dict(status="PASS", summary="Verified standards"),
                       spec=dict(status="PASS", summary="Verified spec"), findings=[],
                       acceptance=[dict(index=1, status="PASS", evidence="checks.log")])
-        evidence = dict(request_digest=digest(request), head_before=request["head_sha"], head_after=request["head_sha"],
+        evidence = dict(request_digest=digest(request), issue_digest=issue_digest,
+                        parent_digest="c" * 64 if request.get("parent_issue") else None,
+                        head_before=request["head_sha"], head_after=request["head_sha"],
                         dirty_before="", dirty_after="", process_exit=0, model_error=False,
                         session_id=session, init_session_id=session, skill=dict(name=request["review_skill"], loaded=True),
                         parent_models=[request["expected_model"]], agents_invoked=["standards-reviewer", "spec-reviewer"],
                         subagent_models={"standards":[request["expected_model"]],"spec":[request["expected_model"]]},
-                        checks={"checks":dict(exit_code=0,host="windows",argv=["check"],head_sha=request["head_sha"],log="checks.log")}, axes={})
+                        checks={"checks":dict(exit_code=0,host="windows",argv=request["checks"][0]["argv"],head_sha=request["head_sha"],log="checks.log")}, axes={})
         (folder / "checks.log").write_text("executed successfully")
         for axis in ("standards", "spec"):
             child = dict(status="PASS",summary="Independent axis complete",findings=[])
@@ -223,6 +225,67 @@ class CoordinatorTests(unittest.TestCase):
         state = self.run_cli("show")
         self.assertEqual(state["active"]["sessions"], {"opus":"opus-session","fable":"fable-session"})
         self.assertEqual(self.run_cli("next")["action"], "review-retry")
+
+    def assert_fable_context_revalidation(self, change=None):
+        checkout, path, request = self.candidate()
+        self.run_cli("candidate", path, "--checkout", checkout, "--owner", "codex-thread")
+        self.run_cli("intent", "--kind", "review", "--operation", "opus-1")
+        self.run_cli("review", self.review_receipt(request, "CHANGES_REQUIRED"))
+        fable = {**request, "round": 2, "review_model": "claude-fable-5-1", "expected_model": "claude-fable-5-1"}
+        write(path, fable)
+        self.run_cli("candidate", path, "--checkout", checkout, "--owner", "codex-thread", "--escalation-reason", "Discuss recovery")
+        self.run_cli("intent", "--kind", "review", "--operation", "fable-2")
+        self.run_cli("review", self.review_receipt(fable, session="fable-session"))
+        request["round"] = 3
+        issue_digest = "a" * 64
+        if change == "criteria":
+            request["criteria"] = ["Persist and recover after restart"]
+        elif change == "checks":
+            request["checks"] = [dict(name="checks", host="windows", argv=["new-check"], timeout=10)]
+        elif change == "parent":
+            request["parent_issue"] = 2
+        elif change == "spec":
+            issue_digest = "b" * 64
+        write(path, request)
+        self.run_cli("candidate", path, "--checkout", checkout, "--owner", "codex-thread")
+        self.run_cli("intent", "--kind", "review", "--operation", "opus-3")
+        self.run_cli("review", self.review_receipt(request, issue_digest=issue_digest))
+        acceptance = {key: request[key] for key in IDENTITY}
+        acceptance.update(request_digest=digest(request), verdict="PASS", findings=[],
+                          acceptance=[dict(index=1, status="PASS", evidence="same candidate reviewed")])
+        receipt = self.root / "codex.json"
+        write(receipt, acceptance)
+        self.run_cli("accept", receipt, "--owner", "codex-thread")
+        self.assertEqual(self.run_cli("next")["action"], "fable-review" if change else "merge")
+        if change:
+            fable = {**request, "round": 4, "review_model": "claude-fable-5-1", "expected_model": "claude-fable-5-1"}
+            write(path, fable)
+            self.run_cli("candidate", path, "--checkout", checkout, "--owner", "codex-thread", "--escalation-reason", "Recheck current context")
+            self.run_cli("intent", "--kind", "review", "--operation", "fable-4")
+            self.run_cli("review", self.review_receipt(fable, session="fable-session", issue_digest=issue_digest))
+            self.assertEqual(self.run_cli("next")["action"], "merge")
+
+    def test_fable_does_not_accept_replacement_criteria_at_the_same_head(self):
+        self.assert_fable_context_revalidation("criteria")
+
+    def test_fable_does_not_accept_a_changed_live_spec_at_the_same_head(self):
+        self.assert_fable_context_revalidation("spec")
+
+    def test_fable_can_reuse_the_same_context_across_model_and_round_changes(self):
+        self.assert_fable_context_revalidation()
+
+    def test_fable_does_not_accept_replacement_check_commands(self):
+        self.assert_fable_context_revalidation("checks")
+
+    def test_fable_does_not_accept_replacement_parent_specifications(self):
+        self.assert_fable_context_revalidation("parent")
+
+    def test_missing_actual_specification_digest_never_accepts_a_review(self):
+        checkout, path, request = self.candidate()
+        self.run_cli("candidate", path, "--checkout", checkout, "--owner", "codex-thread")
+        self.run_cli("intent", "--kind", "review", "--operation", "review-1")
+        self.run_cli("review", self.review_receipt(request, issue_digest=None), success=False)
+        self.assertEqual(self.run_cli("next")["action"], "reconcile")
 
     def test_concurrent_claims_cannot_create_two_implementation_owners(self):
         self.run_cli("init", self.queue)

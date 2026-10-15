@@ -48,16 +48,21 @@ def review(config, incoming):
         raise ValueError("Request outside configured incoming directory")
     folder = root / "runs" / run
     folder.mkdir(parents=True, exist_ok=False)
-    state = dict(run_id=run, request_digest=digest(request), pid=os.getpid(), stage="preparing", started=time.time())
+    lock = (root / "worker.lock").open("a")
+    lock_identity = os.fstat(lock.fileno())
+    state = dict(run_id=run, request_digest=digest(request), pid=os.getpid(), stage="preparing", started=time.time(),
+                 boot_id=Path("/proc/sys/kernel/random/boot_id").read_text().strip(), worker_uid=os.getuid(),
+                 worker_lock=dict(device=lock_identity.st_dev, inode=lock_identity.st_ino))
     state["pid_start_ticks"] = Path(f"/proc/{os.getpid()}/stat").read_text().rsplit(")", 1)[1].split()[19]
     evidence = dict(request_digest=digest(request), checks={})
     evidence["tool_manifest"] = files_index(HERE, [p.name for p in HERE.iterdir()
         if p.is_file() and (p.suffix == ".py" or p.name == "project.json")])
     write(folder / "status.json", state)
     write(folder / "request.json", request)
-    lock = (root / "worker.lock").open("a")
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        state["worker_lock_acquired"] = True
+        write(folder / "status.json", state)
         if (root / "cleanup-blocked.json").exists():
             raise RuntimeError("Prior process cleanup unresolved; inspect cleanup-blocked.json")
         local = read(incoming / "local-evidence.json")

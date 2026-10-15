@@ -14,7 +14,8 @@ from datetime import datetime
 from pathlib import Path
 
 from delivery import HERE, read, write, output, run_id, files_index
-from review_gate import IDENTITY, digest, gate, validate_request, verify_files, review_model, codex_gate
+from review_gate import (IDENTITY, digest, gate, validate_request, verify_files, review_model,
+                         codex_gate, review_contract, review_context_digest)
 
 
 @contextlib.contextmanager
@@ -143,7 +144,7 @@ def record_candidate(state, args):
     if output(["git", "merge-base", request["target_base_sha"], request["head_sha"]], checkout) != request["target_base_sha"]:
         raise ValueError("Review an integration candidate containing the target base")
     if review_model(request) != "opus":
-        if not previous or any(request[key] != previous[key] for key in IDENTITY):
+        if not previous or review_contract(request) != review_contract(previous):
             raise ValueError("Fable escalation must address the exact existing Opus candidate")
         if not args.escalation_reason:
             raise ValueError("Fable needs a substantive discussion reason; quota is a retry")
@@ -167,7 +168,8 @@ def consensus_stage(active):
     fable = active.get("fable_receipt", {})
     if opus.get("request_digest") != digest(request):
         active["stage"] = "review-retry"
-    elif active.get("fable_required") and fable.get("identity") != {key: request[key] for key in IDENTITY}:
+    elif active.get("fable_required") and (not fable.get("context_digest")
+            or fable["context_digest"] != opus.get("context_digest")):
         active["stage"] = "fable-review"
     elif not active.get("codex_acceptance"):
         active["stage"] = "codex-acceptance"
@@ -227,7 +229,8 @@ def record_review(state, args):
     receipt = dict(path=str(folder), request_digest=digest(request), identity={key: request[key] for key in IDENTITY},
                    role=role, verdict="PASS" if passed else "CHANGES_REQUIRED" if isinstance(report, dict)
                    and report.get("verdict") == "CHANGES_REQUIRED" else "INSUFFICIENT", problems=problems,
-                   evidence_digest=digest(evidence), status_digest=digest(status), session_id=session)
+                   evidence_digest=digest(evidence), status_digest=digest(status), session_id=session,
+                   context_digest=review_context_digest(request, evidence) if passed else None)
     active["reviews"].append(receipt)
     active.pop("pending")
     active.pop("retry_at", None)
@@ -256,16 +259,23 @@ def merge_candidate(state, args):
     acceptance = active["codex_acceptance"]
     if digest(read(acceptance["path"])) != acceptance["digest"]:
         raise ValueError("Stored Codex acceptance changed")
+    contexts = set()
     for role in ("opus", "fable") if active.get("fable_required") else ("opus",):
         receipt = active[role + "_receipt"]
         folder = Path(receipt["path"])
         reviewed_request, evidence = read(folder / "request.json"), read(folder / "evidence.json")
-        if (receipt["identity"] != {key:request[key] for key in IDENTITY}
+        if (review_contract(reviewed_request) != review_contract(request)
                 or digest(evidence) != receipt["evidence_digest"]
                 or digest(read(folder / "status.json")) != receipt["status_digest"]
                 or gate(reviewed_request, read(folder / "report.json"), evidence)
                 or verify_files(folder, evidence.get("files"))):
             raise ValueError(f"Stored {role} review changed or no longer passes")
+        context = review_context_digest(reviewed_request, evidence)
+        if context != receipt.get("context_digest"):
+            raise ValueError(f"Stored {role} review context changed")
+        contexts.add(context)
+    if len(contexts) != 1:
+        raise ValueError("Opus and Fable must accept the same current review context and specifications")
     if not active.get("pending"):
         active["pending"] = dict(kind="merge", issue=args.issue, request_digest=digest(request), created=time.time())
         state["revision"] += 1

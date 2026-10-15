@@ -321,6 +321,7 @@ const SYSTEM_PATHS = [
   'lib/template-manifest.mjs',
   'scan-hn.mjs',
   'scripts/check-syntax.mjs',
+  'scripts/delivery/',
   'scripts/export-ats-text.mjs',
   'scripts/followup-sweep.sh',
   'story-provenance-check.mjs',
