@@ -1,0 +1,19 @@
+{
+  "repo": "baidae0706-dot/career-ops",
+  "issue": 1,
+  "parent_issue": null,
+  "pr": 1,
+  "round": 1,
+  "base_sha": "REPLACE_WITH_40_CHARACTER_BASE_SHA",
+  "head_sha": "REPLACE_WITH_40_CHARACTER_HEAD_SHA",
+  "target_base_sha": "REPLACE_WITH_40_CHARACTER_TARGET_SHA",
+  "target_branch": "main",
+  "review_model": "opus",
+  "expected_model": "claude-opus-5-5",
+  "review_skill": "matt-code-review",
+  "criteria": ["Replace with every acceptance criterion from the Issue and parent specification"],
+  "checks": [
+    {"name": "delivery-windows", "host": "windows", "argv": ["python", "scripts/delivery/run_tests.py"], "timeout": 300},
+    {"name": "delivery-linux", "host": "linux", "argv": ["python3", "scripts/delivery/run_tests.py"], "timeout": 300}
+  ]
+}

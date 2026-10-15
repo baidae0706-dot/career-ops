@@ -1,0 +1,12 @@
+{
+  "repo": "baidae0706-dot/career-ops",
+  "ssh_host": "tcvps",
+  "checkout": "/home/ubuntu/projects/career-ops-review",
+  "remote_root": "/home/ubuntu/.local/share/codex-delivery/career-ops",
+  "merge_method": "squash",
+  "review_skill": "matt-code-review",
+  "actual_models": {
+    "opus": "claude-opus-5-5",
+    "claude-fable-5-1": "claude-fable-5-1"
+  }
+}

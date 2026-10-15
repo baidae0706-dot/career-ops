@@ -272,3 +272,8 @@ data/interview-prep/
 /tectonic.exe
 /tectonic.part
 /tectonic.part.exe
+
+# Fork delivery state and test scratch; never commit sessions or receipts.
+/local/
+__pycache__/
+*.pyc

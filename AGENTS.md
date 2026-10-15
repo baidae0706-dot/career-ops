@@ -1,5 +1,13 @@
 # Career-Ops -- AI Job Search Pipeline
 
+## Fork development
+
+- Specs, Issues, PRs or upstream integration: read `docs/agents/issue-tracker.md`.
+- Requirements, naming or architecture: read `docs/agents/domain.md`.
+- Implementing, reviewing, repairing, merging or resuming the unattended queue:
+  read `docs/agents/delivery.md`. Codex owns source changes; VPS reviewers are
+  read-only. Preserve personal data and unrelated dirty checkouts.
+
 ## Origin
 
 Built and used by [santifer](https://santifer.io) to evaluate 740+ offers, generate 100+ tailored CVs, and land a Head of Applied AI role. The archetypes, scoring, and negotiation scripts reflect that search; his portfolio is also open source: [cv-santiago](https://github.com/santifer/cv-santiago).
