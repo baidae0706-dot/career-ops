@@ -5,11 +5,11 @@ if (process.env.SCAN_COMPAT_AUDIT && path.basename(process.argv[1] || '') === 's
   fs.appendFileSync(process.env.SCAN_COMPAT_AUDIT, JSON.stringify({ pid: process.pid, argv: process.argv.slice(1), overlay: fs.readFileSync(process.env.CAREER_OPS_PORTALS, 'utf8') }) + '\n');
 }
 if (path.basename(process.argv[1] || '') === 'scan.mjs') {
+if (process.env.SCAN_COMPAT_FAIL === '1') throw new Error('Synthetic scanner startup failure');
 let step = 0;
 globalThis.fetch = async (url, init = {}) => {
   const u = new URL(url);
   if (u.origin !== 'https://api.apify.com' || init.headers?.authorization !== 'Bearer fixture-token' || u.searchParams.has('token')) throw new Error('Unexpected test egress or authentication');
-  if (process.env.SCAN_COMPAT_FAIL === '1') return new Response('{}', { status: 400 });
   const expected = ['/v2/acts/fixture~zhaopin/runs', '/v2/actor-runs/fixture-run', '/v2/actor-runs/fixture-run/dataset/items'];
   if (u.pathname !== expected[step]) throw new Error(`Unexpected test request ${u.pathname}`);
   if (step === 0) {

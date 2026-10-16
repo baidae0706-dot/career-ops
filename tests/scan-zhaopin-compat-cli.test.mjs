@@ -75,7 +75,7 @@ for (const days of [0, 7, '0']) test(`real runner keeps numeric portals0 distinc
 });
 
 
-test('real runner cleans every failed Apify attempt without changing source input', () => {
+test('real runner cleans every failed scanner startup without changing source input', () => {
   const root = workspace('apify');
   const original = read(root, 'portals.yml');
   const id = '11111111-1111-4111-8111-111111111111';
