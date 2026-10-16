@@ -8,6 +8,7 @@
   "head_sha": "REPLACE_WITH_40_CHARACTER_HEAD_SHA",
   "target_base_sha": "REPLACE_WITH_40_CHARACTER_TARGET_SHA",
   "target_branch": "main",
+  "merge_method": "squash",
   "review_model": "opus",
   "expected_model": "claude-opus-5-5",
   "review_skill": "matt-code-review",

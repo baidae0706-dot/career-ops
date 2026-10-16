@@ -8,7 +8,7 @@ background coding service. A thread heartbeat resumes the owner while Codex is
 available; an already launched VPS review can finish independently.
 
 The user's recorded authorization for this queue includes specification, ticket
-publication, implementation, repair, review, squash merge and Issue closure.
+publication, implementation, repair, review, verified merge and Issue closure.
 Routine skill confirmation defaults do not interrupt that authorization. It does
 not authorize paid job scans, sending applications, deployment, invented career
 facts, or changing reference projects. Product confirmations remain required.
@@ -34,7 +34,11 @@ facts, or changing reference projects. Product confirmations remain required.
    closure follows verified integration, not GitHub's automatic merge callback.
 5. Create a request JSON with all fields in `scripts/delivery/request.example.json`.
    Resolve full base, head and target-base SHA values; the target base must be an
-   ancestor of head. Include every acceptance criterion and bounded check argv
+   ancestor of head. Ordinary tickets omit `merge_method` or select `squash`.
+   Official integration tickets explicitly select `merge` and pin a full
+   `upstream_sha`, also an ancestor of head; any changed selection requires fresh
+   review. See [the ancestry decision](../adr/0001-preserve-upstream-ancestry.md).
+   Include every acceptance criterion and bounded check argv
    with its actual host. Register it with `candidate --owner ORIGINAL_THREAD`.
 6. Run `delivery.py prepare`, persist `coordinator.py intent --kind review`, then
    `delivery.py dispatch`. The same run ID/payload resumes partial upload. A lost
@@ -58,9 +62,13 @@ facts, or changing reference projects. Product confirmations remain required.
 10. Record Codex's acceptance with `accept`; it binds every criterion and finding
     to the exact Opus request. `next` reaches `merge` only after both accept and
     any invoked Fable passes. Use `coordinator.py merge --issue N`; it rechecks
-    receipts, live GitHub spec/head/base/readiness/CI, then squash-merges the exact
+    receipts, live GitHub spec/head/base/readiness/CI, then uses the request's merge method for the exact
     head through one GitHub REST merge mutation without admin bypass. It verifies
-    the merge's single parent and tree,
+    the reviewed tree and ordered parents: `[target_base_sha]` for squash or
+    `[target_base_sha, head_sha]` for official integration. The latter preserves
+    the already-proved upstream ancestry through its second parent. It rechecks
+    that the current target contains the merge on every resume and separately
+    before the acceptance comment and Issue closure,
     adds one acceptance comment and confirms Issue closure before advancing.
 
 All commands accept `--config`; coordinator commands accept `--state` and optional
@@ -155,7 +163,13 @@ not an automatic OS proof service or a cross-checkout coordinator. No success
 receipt is published for a failed or uncertain transfer. A busy lock,
 unknown process identity or uncertain launch remains pending, never relaunched.
 A merge reruns `merge --issue N`, which reads actual PR/merge/comment/closure
-state. The finish journal lives beside the immutable review receipt. A provably
+state. Target containment compares the merge SHA against a newly observed full
+target SHA, verifying the compare response's base and common ancestor rather
+than a paginated commits list. Even a previously merged PR and closed Issue
+require this proof before queue advancement. GitHub REST's `sha` condition pins
+the PR head, not the target base atomically; a race is caught by post-merge
+parents/tree verification, and it does not authorize closing the Issue. The finish
+journal lives beside the immutable review receipt. A provably
 unsubmitted or explicitly rejected single-request mutation can retry normally.
 For an unknown merge or closure, use `merge --issue N --reconcile-operation merge`
 or `close`; this repeats the idempotent mutation only after rechecking the same

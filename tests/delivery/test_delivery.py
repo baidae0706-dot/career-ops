@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from delivery import CleanupError, execute_checks, files_index, live_candidate, premerge, terminate_tree, write
-from review_gate import IDENTITY, digest, gate, spec_digest, validate_request, verify_files, repository_matches
+from review_gate import IDENTITY, digest, gate, spec_digest, validate_request, verify_files, repository_matches, merge_method, review_contract, codex_gate
 from review_protocol import axis_receipts, session_arguments, validate_session_model, skill_receipt
 
 
@@ -240,7 +240,7 @@ class DeliveryTests(unittest.TestCase):
             with patch("delivery.gh",return_value=dict(title="changed",body="req",comments=[])), self.assertRaises(RuntimeError):
                 premerge(self.config,root)
             pr=dict(state="OPEN",isDraft=False,mergeable="MERGEABLE",statusCheckRollup=[dict(__typename="CheckRun",status="IN_PROGRESS")])
-            with patch("delivery.gh",return_value=dict(title="old",body="req",comments=[])), patch("delivery.live_candidate",return_value=pr), self.assertRaises(RuntimeError):
+            with patch("delivery.gh",return_value=dict(title="old",body="req",comments=[])), patch("delivery.live_candidate",return_value=pr), patch("delivery.require_candidate_ancestry"), self.assertRaises(RuntimeError):
                 premerge(self.config,root)
 
     def test_child_completion_and_axis_identity_required(self):
@@ -323,6 +323,33 @@ class DeliveryTests(unittest.TestCase):
                         fcntl.flock(contender,fcntl.LOCK_EX|fcntl.LOCK_NB)
             finally:
                 terminate_tree(child)
+
+
+    def test_merge_method_contract_defaults_only_ordinary_tickets(self):
+        self.assertEqual(merge_method(self.request), "squash")
+        validate_request({**self.request, "merge_method": "squash"}, self.config)
+        official = {**self.request, "merge_method": "merge", "upstream_sha": "c" * 40}
+        validate_request(official, self.config)
+        for change in ({"merge_method": None}, {"merge_method": ""}, {"merge_method": "rebase"},
+                       {"upstream_sha": "c" * 40}, {"upstream_sha": None}, {"merge_method": "merge"},
+                       {"merge_method": "merge", "upstream_sha": "short"},
+                       {"merge_method": "squash", "upstream_sha": "c" * 40}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                validate_request({**self.request, **change}, self.config)
+        acceptance = {**self.report, "request_digest": digest(self.request)}
+        self.assertEqual(gate(self.request, self.report, self.evidence), [])
+        self.assertEqual(codex_gate(self.request, acceptance), [])
+        self.assertNotEqual(review_contract(official), review_contract(self.request))
+        self.assertTrue(gate(official, self.report, self.evidence))
+        self.assertTrue(codex_gate(official, acceptance))
+        official_evidence = {**self.evidence, "request_digest": digest(official)}
+        official_acceptance = {**acceptance, "request_digest": digest(official)}
+        self.assertEqual(gate(official, self.report, official_evidence), [])
+        self.assertEqual(codex_gate(official, official_acceptance), [])
+        changed = {**official, "upstream_sha": "d" * 40}
+        self.assertNotEqual(review_contract(changed), review_contract(official))
+        self.assertTrue(gate(changed, self.report, official_evidence))
+        self.assertTrue(codex_gate(changed, official_acceptance))
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""Reconcile one accepted candidate through squash merge, receipt and Issue closure.
+"""Reconcile one accepted candidate through verified merge, receipt and Issue closure.
 
 The caller supplies the reviewed receipt and Codex's independent agreement.
 Mutable finish records live beside that immutable receipt, never inside it.
@@ -15,8 +15,8 @@ import subprocess
 import uuid
 from pathlib import Path
 
-from delivery import HERE, output, premerge, read, terminate_tree, write, require_cleanup_resolved
-from review_gate import codex_gate, digest, gate, spec_digest, validate_request, verify_files
+from delivery import HERE, output, premerge, read, terminate_tree, write, require_cleanup_resolved, require_candidate_ancestry
+from review_gate import codex_gate, digest, gate, spec_digest, validate_request, verify_files, merge_method
 
 
 def file_digest(path):
@@ -211,12 +211,28 @@ def read_pr(config, request):
     return pr
 
 
+def require_target_contains_merge(config, request, merge_sha):
+    """Bind containment to an observed target SHA, not a paginated commit list."""
+    target = github_json(config, "api", f"repos/{config['repo']}/git/ref/heads/{request['target_branch']}")
+    target_sha = target["object"]["sha"]
+    if not isinstance(target_sha, str) or not re.fullmatch(r"[a-f0-9]{40}", target_sha):
+        raise RuntimeError("Live target SHA is invalid")
+    comparison = github_json(config, "api", f"repos/{config['repo']}/compare/{merge_sha}...{target_sha}")
+    if (comparison.get("base_commit", {}).get("sha") != merge_sha
+            or comparison.get("merge_base_commit", {}).get("sha") != merge_sha
+            or comparison.get("status") not in ("ahead", "identical")):
+        raise RuntimeError("Current target does not contain the verified merge; do not close Issue")
+    return target_sha
+
+
 def acceptance_comment(request, report, evidence, merge_sha, tree, codex_sha):
     marker = f"<!-- delivery-acceptance:{request['repo']}:{request['issue']}:{digest(request)} -->"
     lines = [marker, "## Codex 与 VPS Opus 验收通过", "",
         f"审查提交：`{request['head_sha']}`；比较基线：`{request['base_sha']}`。",
-        f"PR #{request['pr']} 已 Squash 合并为 `{merge_sha}`。",
-        f"集成父提交：`{request['target_base_sha']}`；合并树与审查树 `{tree}` 相同。", "",
+        (f"PR #{request['pr']} 已 Squash 合并为 `{merge_sha}`。" if merge_method(request) == "squash"
+         else f"PR #{request['pr']} 已按 `merge` 合并为 `{merge_sha}`。"),
+        f"集成父提交：`{request['target_base_sha']}`；合并树与审查树 `{tree}` 相同。",
+        *([f"保留官方祖先：`{request['upstream_sha']}`；第二父为审查提交。"] if merge_method(request) == "merge" else []), "",
         f"Standards：{report['standards']['summary']}", f"Spec：{report['spec']['summary']}", "",
         "逐项验收："]
     lines.extend(f"- {item['index']}. {item['status']} — {item['evidence']}" for item in report["acceptance"])
@@ -245,9 +261,8 @@ def finish(config, folder, checkout, codex_acceptance=None, reconcile_operation=
 
 
 def finish_locked(config, folder, checkout, codex_path, destination, reconcile_operation):
-    if config.get("merge_method") != "squash":
-        raise RuntimeError("Only the configured squash merge is supported")
     request, report, evidence = verified_acceptance(config, folder, codex_path)
+    method = merge_method(request)
     identity = dict(request_digest=digest(request), evidence_digest=digest(evidence),
                     report_sha256=file_digest(folder / "report.json"), codex_sha256=file_digest(codex_path))
     state_path = destination / "state.json"
@@ -259,7 +274,7 @@ def finish_locked(config, folder, checkout, codex_path, destination, reconcile_o
     verify_specifications(config, request, evidence, state.get("comment"))
     pr = read_pr(config, request)
     tree = output(["git", "rev-parse", request["head_sha"] + "^{tree}"], checkout)
-    output(["git", "merge-base", "--is-ancestor", request["target_base_sha"], request["head_sha"]], checkout)
+    require_candidate_ancestry(request, checkout)
     remote_head = github_json(config, "api", f"repos/{config['repo']}/commits/{request['head_sha']}")
     if remote_head["commit"]["tree"]["sha"] != tree:
         raise RuntimeError("Local candidate tree differs from the remote reviewed head")
@@ -269,8 +284,9 @@ def finish_locked(config, folder, checkout, codex_path, destination, reconcile_o
         if state.get("pending") == "merge" and reconcile_operation != "merge":
             raise RuntimeError("Merge outcome is unknown; reconcile before another send")
         settings = github_json(config, "api", f"repos/{config['repo']}")
-        if not settings.get("allow_squash_merge"):
-            raise RuntimeError("Repository does not permit squash merge")
+        setting = "allow_merge_commit" if method == "merge" else "allow_squash_merge"
+        if not settings.get(setting):
+            raise RuntimeError(f"Repository does not permit {method} merge")
         target = github_json(config, "api", f"repos/{config['repo']}/git/ref/heads/{request['target_branch']}")
         if target["object"]["sha"] != request["target_base_sha"]:
             raise RuntimeError("Live target branch changed since review")
@@ -280,16 +296,18 @@ def finish_locked(config, folder, checkout, codex_path, destination, reconcile_o
             state.setdefault("reconciliations", []).append(dict(operation="merge", reason="exact_head_open_and_gates_rechecked"))
         send_mutation(config, state, state_path, destination, "merge", "PUT",
                       f"repos/{config['repo']}/pulls/{request['pr']}/merge",
-                      dict(sha=request["head_sha"], merge_method="squash"))
+                      dict(sha=request["head_sha"], merge_method=method))
         pr = read_pr(config, request)
     if pr["state"] != "MERGED" or not pr.get("mergeCommit"):
         raise RuntimeError("Merge is not confirmed; preserve the pending operation")
     merge_sha = pr["mergeCommit"]["oid"]
     commit = github_json(config, "api", f"repos/{config['repo']}/commits/{merge_sha}")
-    if [parent["sha"] for parent in commit["parents"]] != [request["target_base_sha"]]:
+    parents = [request["target_base_sha"]] + ([request["head_sha"]] if method == "merge" else [])
+    if [parent["sha"] for parent in commit["parents"]] != parents:
         raise RuntimeError("Merged parent differs from reviewed integration; do not close Issue")
     if commit["commit"]["tree"]["sha"] != tree:
         raise RuntimeError("Merged tree differs from reviewed candidate; do not close Issue")
+    target_sha = require_target_contains_merge(config, request, merge_sha)
     state.update(merge_sha=merge_sha, tree=tree)
     if state.get("pending") == "merge":
         state["pending"] = None
@@ -304,6 +322,7 @@ def finish_locked(config, folder, checkout, codex_path, destination, reconcile_o
             raise RuntimeError("Acceptance comment outcome is unknown; reconcile before another send")
         body_path = destination / "acceptance.md"
         body_path.write_text(proposed["body"], encoding="utf-8", newline="\n")
+        target_sha = require_target_contains_merge(config, request, merge_sha)
         send_mutation(config, state, state_path, destination, "comment", "POST",
                       f"repos/{config['repo']}/issues/{request['issue']}/comments", dict(body=proposed["body"]))
         issue, own_comment = verify_specifications(config, request, evidence, proposed)
@@ -318,6 +337,7 @@ def finish_locked(config, folder, checkout, codex_path, destination, reconcile_o
             raise RuntimeError("Issue closure outcome is unknown; reconcile before another send")
         if state.get("pending") == "close":
             state.setdefault("reconciliations", []).append(dict(operation="close", reason="verified_merge_and_issue_open"))
+        target_sha = require_target_contains_merge(config, request, merge_sha)
         send_mutation(config, state, state_path, destination, "close", "PATCH",
                       f"repos/{config['repo']}/issues/{request['issue']}", dict(state="closed", state_reason="completed"))
         issue, own_comment = verify_specifications(config, request, evidence, proposed)
@@ -325,7 +345,9 @@ def finish_locked(config, folder, checkout, codex_path, destination, reconcile_o
         raise RuntimeError("Issue closure not confirmed; preserve the pending operation")
     receipt = dict(closed=True, repo=config["repo"], issue=request["issue"], pr=request["pr"],
         head=request["head_sha"], merge_sha=merge_sha, tree=tree, parent=request["target_base_sha"],
-        merge_method="squash", comment_sha256=proposed["body_sha256"], **identity)
+        merge_method=method, parents=parents, target_head_sha=target_sha,
+        **({"upstream_sha": request["upstream_sha"]} if method == "merge" else {}),
+        comment_sha256=proposed["body_sha256"], **identity)
     write(destination / "closure.json", receipt)
     state.update(pending=None, closed=True)
     write(state_path, state)

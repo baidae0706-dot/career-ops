@@ -351,6 +351,9 @@ class CoordinatorTests(unittest.TestCase):
 
     def assert_fable_context_revalidation(self, change=None):
         checkout, path, request = self.candidate()
+        if change == "upstream":
+            request.update(merge_method="merge", upstream_sha=request["base_sha"])
+            write(path, request)
         self.run_cli("candidate", path, "--checkout", checkout, "--owner", "codex-thread")
         self.run_cli("intent", "--kind", "review", "--operation", "opus-1")
         self.run_cli("review", self.review_receipt(request, "CHANGES_REQUIRED"))
@@ -369,6 +372,10 @@ class CoordinatorTests(unittest.TestCase):
             request["parent_issue"] = 2
         elif change == "spec":
             issue_digest = "b" * 64
+        elif change == "merge_method":
+            request.update(merge_method="merge", upstream_sha=request["base_sha"])
+        elif change == "upstream":
+            request["upstream_sha"] = request["head_sha"]
         write(path, request)
         self.run_cli("candidate", path, "--checkout", checkout, "--owner", "codex-thread")
         self.run_cli("intent", "--kind", "review", "--operation", "opus-3")
@@ -402,6 +409,24 @@ class CoordinatorTests(unittest.TestCase):
 
     def test_fable_does_not_accept_replacement_parent_specifications(self):
         self.assert_fable_context_revalidation("parent")
+
+    def test_fable_does_not_accept_a_changed_merge_method(self):
+        self.assert_fable_context_revalidation("merge_method")
+
+    def test_fable_does_not_accept_a_changed_upstream(self):
+        self.assert_fable_context_revalidation("upstream")
+
+    def test_candidate_requires_frozen_upstream_ancestry(self):
+        checkout, path, request = self.candidate()
+        tree = subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], cwd=checkout, text=True).strip()
+        upstream = subprocess.check_output(["git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+            "-c", "commit.gpgsign=false", "commit-tree", tree, "-m", "unrelated upstream"], cwd=checkout, text=True).strip()
+        request.update(merge_method="merge", upstream_sha=upstream)
+        write(path, request)
+        state_before = self.state.read_bytes()
+        rejected = self.run_cli("candidate", path, "--checkout", checkout, "--owner", "codex-thread", success=False)
+        self.assertNotEqual(rejected.returncode, 0)
+        self.assertEqual(self.state.read_bytes(), state_before)
 
     def test_missing_actual_specification_digest_never_accepts_a_review(self):
         checkout, path, request = self.candidate()

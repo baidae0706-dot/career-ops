@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from review_gate import digest, gate, spec_digest, validate_request, verify_files, validate_title, validate_branch
+from review_gate import digest, gate, spec_digest, validate_request, verify_files, validate_title, validate_branch, merge_method
 
 HERE = Path(__file__).resolve().parent
 
@@ -131,6 +131,20 @@ def require_cleanup_resolved(checkout):
     return blocked
 
 
+def require_candidate_ancestry(request, checkout):
+    ancestors = [("target base", request["target_base_sha"])]
+    if merge_method(request) == "merge":
+        ancestors.append(("frozen upstream", request["upstream_sha"]))
+    for label, ancestor in ancestors:
+        problem = f"Review an integration candidate containing the {label}"
+        try:
+            common = output(["git", "merge-base", ancestor, request["head_sha"]], checkout)
+        except subprocess.CalledProcessError as error:
+            raise ValueError(problem) from error
+        if common != ancestor:
+            raise ValueError(problem)
+
+
 def prepare(config, source, checkout, folder):
     request = read(source)
     validate_request(request, config)
@@ -141,6 +155,7 @@ def prepare(config, source, checkout, folder):
         raise RuntimeError("Local candidate SHA mismatch")
     if output(["git", "status", "--porcelain"], checkout):
         raise RuntimeError("Local candidate is dirty; preserve it")
+    require_candidate_ancestry(request, checkout)
     live_candidate(config, request)
     folder.mkdir(parents=True, exist_ok=False)
     write(folder / "request.json", request)
@@ -354,6 +369,7 @@ def premerge(config, folder, checkout=None):
         live = gh(config, "issue", "view", str(number), "--json", "title,body,comments")
         if spec_digest(live) != evidence[f"{key}_digest"]:
             raise RuntimeError(f"{key} specification changed")
+    require_candidate_ancestry(request, checkout if checkout is not None else HERE.parents[1])
     pr = live_candidate(config, request)
     if pr["state"] != "OPEN" or pr["isDraft"] or pr["mergeable"] != "MERGEABLE":
         raise RuntimeError("PR is not an open, ready, mergeable candidate")
@@ -364,7 +380,7 @@ def premerge(config, folder, checkout=None):
         elif check.get("state") != "SUCCESS":
             raise RuntimeError("GitHub status is failing or pending")
     print(json.dumps(dict(premerge="PASS", repo=config["repo"], pr=request["pr"],
-                         head=request["head_sha"], merge_method=config["merge_method"],
+                         head=request["head_sha"], merge_method=merge_method(request),
                          note="Coordinator must inspect reports, respect authorization, then merge and verify closure.")))
 
 

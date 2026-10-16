@@ -60,7 +60,24 @@ def validate_branch(branch, issue):
         raise ValueError("Branch must use type/issue-N-clear-description for this Issue")
 
 
+def merge_method(request):
+    """Ordinary tickets squash; an explicit upstream integration preserves ancestry."""
+    method = request.get("merge_method", "squash")
+    if method not in ("squash", "merge"):
+        raise ValueError("Unsupported merge method")
+    if method == "merge":
+        upstream = request.get("upstream_sha")
+        if not isinstance(upstream, str) or not re.fullmatch(r"[a-f0-9]{40}", upstream):
+            raise ValueError("Merge integration requires an immutable upstream SHA")
+    elif "upstream_sha" in request:
+        raise ValueError("An upstream SHA requires explicit merge_method=merge")
+    return method
+
+
 def validate_request(request, config):
+    merge_method(request)
+    if config.get("merge_method", "squash") != "squash":
+        raise ValueError("The project default merge method must remain squash")
     model = review_model(request)
     if request.get("expected_model") != config.get("actual_models", {}).get(model) or not request.get("expected_model"):
         raise ValueError("Actual model must be pinned by project configuration")

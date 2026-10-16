@@ -101,7 +101,8 @@ class FinishDeliveryTests(unittest.TestCase):
         self.pr_base = self.base
         self.live_base = self.base
         self.target_branch = "release/web"
-        self.merge_sha = "e" * 40
+        self.merge_sha = self.git("-c", "user.name=Delivery Test", "-c", "user.email=test@example.invalid",
+                                  "commit-tree", self.tree, "-p", self.base, "-m", "integrated candidate")
         self.merge_tree = self.tree
         self.merge_parents = [self.base]
         self.comments = []
@@ -119,6 +120,10 @@ class FinishDeliveryTests(unittest.TestCase):
         self.draft = False
         self.mergeable = "MERGEABLE"
         self.checks = []
+        self.allow_merge_commit = True
+        self.comparison_override = {}
+        self.containment_calls = 0
+        self.remove_target_on_containment = None
 
     def git(self, *args):
         return self.real_output(["git", "-c", "commit.gpgsign=false", *args], cwd=self.checkout, text=True, encoding="utf-8").strip()
@@ -155,11 +160,22 @@ class FinishDeliveryTests(unittest.TestCase):
             route = args[1]
             prefix = f"repos/{self.config['repo']}"
             if route == prefix:
-                return json.dumps(dict(allow_squash_merge=True))
+                return json.dumps(dict(allow_squash_merge=True, allow_merge_commit=self.allow_merge_commit))
             if route == f"{prefix}/pulls/{self.request['pr']}":
                 return json.dumps(dict(title=self.spec["title"], head=dict(sha=self.pr_head, ref=f"chore/issue-{self.request['issue']}-delivery"), base=dict(sha=self.pr_base, ref=self.target_branch)))
             if route == f"{prefix}/git/ref/heads/{self.target_branch}":
+                if self.pr_state == "MERGED" and self.remove_target_on_containment == self.containment_calls + 1:
+                    self.live_base = self.base
                 return json.dumps(dict(object=dict(sha=self.live_base)))
+            if route.startswith(f"{prefix}/compare/"):
+                start, end = route.split("/compare/", 1)[1].split("...")
+                self.assertEqual(start, self.merge_sha)
+                self.assertEqual(end, self.live_base)
+                self.containment_calls += 1
+                common = self.git("merge-base", start, end)
+                status = "identical" if start == end else "ahead" if common == start else "diverged"
+                return json.dumps({**dict(base_commit=dict(sha=start), merge_base_commit=dict(sha=common),
+                                         status=status), **self.comparison_override})
             if route == f"{prefix}/commits/{self.head}":
                 return json.dumps(dict(commit=dict(tree=dict(sha=self.tree))))
             if route == f"{prefix}/commits/{self.merge_sha}":
@@ -203,7 +219,7 @@ class FinishDeliveryTests(unittest.TestCase):
                 return 1, stdout, stderr
             self.mutations.append(operation.split())
             if operation == "pr merge":
-                self.assertEqual(payload, dict(sha=self.head, merge_method="squash"))
+                self.assertEqual(payload, dict(sha=self.head, merge_method=self.request.get("merge_method", "squash")))
                 self.pr_state = "MERGED"
                 self.live_base = self.merge_sha
             elif operation == "issue comment":
@@ -402,6 +418,7 @@ class FinishDeliveryTests(unittest.TestCase):
             self.assertEqual(self.finish_state()["pending"], "comment")
             self.assertEqual(len(self.rest_requests), writes)
         self.pr_state = "MERGED"
+        self.live_base = self.merge_sha
         self.hide_comments = False
         self.assertTrue(self.finish()["closed"])
         self.assertEqual(len(self.comments), 1)
@@ -490,6 +507,7 @@ class FinishDeliveryTests(unittest.TestCase):
             self.finish()
         self.assertEqual(sum(args[:2] == ["pr", "merge"] for args in self.mutations), 1)
         self.pr_state = "MERGED"
+        self.live_base = self.merge_sha
         self.assertTrue(self.finish()["closed"])
 
     def test_lost_close_ack_is_reconciled_without_repeating_close(self):
@@ -597,7 +615,7 @@ class FinishDeliveryTests(unittest.TestCase):
         self.evidence["request_digest"] = digest(self.request)
         self.pr_base = self.live_base = later
         self.save_receipt()
-        with self.assertRaises(subprocess.CalledProcessError):
+        with self.assertRaisesRegex(ValueError, "target base"):
             self.finish()
         self.assertEqual(self.mutations, [])
 
@@ -631,6 +649,183 @@ class FinishDeliveryTests(unittest.TestCase):
         self.assertEqual(state["comment"]["body_sha256"], result["comment_sha256"])
         self.comments[0]["body"] = body.replace("\n", "\r\n")
         self.assertEqual(self.finish(), result)
+
+
+    def make_upstream_candidate(self, previous_upstream=None):
+        previous_head = self.head
+        self.git("checkout", "--detach", "-q", previous_upstream or self.base)
+        filename = "upstream-next.txt" if previous_upstream else "upstream.txt"
+        (self.checkout / filename).write_text("official change\n", encoding="utf-8")
+        self.git("add", filename)
+        self.git("-c", "user.name=Delivery Test", "-c", "user.email=test@example.invalid",
+                 "commit", "-qm", "official update")
+        upstream = self.git("rev-parse", "HEAD")
+        self.git("checkout", "--detach", "-q", previous_head)
+        self.git("-c", "user.name=Delivery Test", "-c", "user.email=test@example.invalid",
+                 "merge", "--no-ff", "-qm", "integrate official update", upstream)
+        self.head = self.git("rev-parse", "HEAD")
+        self.tree = self.git("rev-parse", "HEAD^{tree}")
+        self.pr_head = self.head
+        self.merge_parents = [self.base, self.head]
+        self.merge_tree = self.tree
+        self.merge_sha = self.git("-c", "user.name=Delivery Test", "-c", "user.email=test@example.invalid",
+                                  "commit-tree", self.tree, "-p", self.base, "-p", self.head, "-m", "merge PR")
+        self.request.update(merge_method="merge", upstream_sha=upstream, head_sha=self.head,
+                            target_base_sha=self.base, base_sha=self.base)
+        self.report.update({key: self.request[key] for key in IDENTITY})
+        self.codex.update({key: self.request[key] for key in IDENTITY}, request_digest=digest(self.request))
+        self.evidence.update(request_digest=digest(self.request), head_before=self.head, head_after=self.head)
+        self.evidence["checks"]["check"]["head_sha"] = self.head
+        self.evidence["skill"]["args"] = self.base
+        self.save_receipt()
+        return upstream
+
+    def test_two_upstream_integrations_preserve_history_and_next_merge_base(self):
+        first_upstream = self.make_upstream_candidate()
+        old_squash = self.git("-c", "user.name=Delivery Test", "-c", "user.email=test@example.invalid",
+                              "commit-tree", self.tree, "-p", self.base, "-m", "old squash boundary")
+        self.assertEqual(self.git("rev-parse", old_squash + "^{tree}"), self.tree)
+        self.assertEqual(self.git("merge-base", first_upstream, old_squash), self.base)
+        first = self.finish()
+        self.assertEqual(first["merge_method"], "merge")
+        self.assertEqual(first["parents"], [self.base, self.head])
+        self.assertEqual(first["upstream_sha"], first_upstream)
+        self.assertEqual(self.git("merge-base", first_upstream, first["merge_sha"]), first_upstream)
+        self.assertEqual(self.git("show", "-s", "--format=%P", first["merge_sha"]), " ".join(first["parents"]))
+        self.assertEqual(self.git("rev-parse", first["merge_sha"] + "^{tree}"), first["tree"])
+        first_writes = copy.deepcopy(self.mutations)
+        self.assertEqual(self.finish(), first)
+        self.assertEqual(self.mutations, first_writes)
+
+        self.base = self.head = first["merge_sha"]
+        self.live_base = self.pr_base = self.base
+        self.pr_state = self.issue_state = "OPEN"
+        self.comments = []
+        self.request.update(issue=52, pr=101, round=1)
+        original_folder = self.folder
+        self.folder = self.root / "second-review-round"
+        self.folder.mkdir()
+        for path in original_folder.iterdir():
+            (self.folder / path.name).write_bytes(path.read_bytes())
+        second_upstream = self.make_upstream_candidate(first_upstream)
+        self.assertEqual(self.git("merge-base", self.base, second_upstream), first_upstream)
+        second = self.finish()
+        self.assertEqual(second["parents"], [first["merge_sha"], self.head])
+        self.assertEqual(self.git("merge-base", second_upstream, second["merge_sha"]), second_upstream)
+        self.assertEqual(self.git("merge-base", first_upstream, second["merge_sha"]), first_upstream)
+        self.assertEqual(self.git("rev-parse", second["merge_sha"] + "^{tree}"), self.tree)
+        self.assertEqual(len([m for m in self.mutations if m == ["pr", "merge"]]), 2)
+
+    def test_upstream_merge_requires_repository_method_setting(self):
+        self.make_upstream_candidate()
+        self.allow_merge_commit = False
+        with self.assertRaisesRegex(RuntimeError, "does not permit merge"):
+            self.finish()
+        self.assertEqual(self.mutations, [])
+
+    def test_upstream_merge_rejects_wrong_order_second_parent_extra_parent_and_tree(self):
+        self.make_upstream_candidate()
+        good_parents = self.merge_parents[:]
+        for parents, tree in (([self.head, self.base], self.tree), ([self.base, self.base], self.tree),
+                              ([self.base, self.head, self.request["upstream_sha"]], self.tree),
+                              ([self.base], self.tree), (good_parents, "f" * 40)):
+            with self.subTest(parents=parents, tree=tree):
+                self.merge_parents, self.merge_tree = parents, tree
+                with self.assertRaisesRegex(RuntimeError, "do not close"):
+                    self.finish()
+                self.assertEqual(self.comments, [])
+                self.assertEqual(self.issue_state, "OPEN")
+        self.merge_parents, self.merge_tree = good_parents, self.tree
+        self.assertTrue(self.finish()["closed"])
+        self.assertEqual(len([m for m in self.mutations if m == ["pr", "merge"]]), 1)
+
+    def test_missing_upstream_ancestry_rejects_even_a_rebound_receipt(self):
+        self.make_upstream_candidate()
+        unrelated = self.git("-c", "user.name=Delivery Test", "-c", "user.email=test@example.invalid",
+                              "commit-tree", self.tree, "-m", "unrelated upstream")
+        self.request["upstream_sha"] = unrelated
+        self.evidence["request_digest"] = self.codex["request_digest"] = digest(self.request)
+        self.save_receipt()
+        with self.assertRaisesRegex(ValueError, "frozen upstream"):
+            self.finish()
+        self.assertEqual(self.mutations, [])
+
+    def test_upstream_lost_merge_ack_resumes_original_payload_once(self):
+        self.make_upstream_candidate()
+        self.ack_loss = "pr merge"
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.finish()
+        payload = self.rest_requests[0]["payload"]
+        self.assertEqual(payload, dict(sha=self.head, merge_method="merge"))
+        self.assertTrue(self.finish()["closed"])
+        self.assertEqual(len([m for m in self.mutations if m == ["pr", "merge"]]), 1)
+        self.assertEqual(self.finish_state()["attempts"][0]["payload_sha256"], digest(payload))
+
+    def test_upstream_unknown_merge_reconcile_keeps_method_head_and_upstream(self):
+        upstream = self.make_upstream_candidate()
+        self.api_failure = ("pr merge", "", "Connection closed without response")
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.finish()
+        original_request = copy.deepcopy(self.request)
+        original_payload = self.rest_requests[0]["payload"]
+        for change in ({"merge_method": "squash"}, {"upstream_sha": self.base}):
+            with self.subTest(change=change):
+                self.request = {**original_request, **change}
+                if change.get("merge_method") == "squash":
+                    self.request.pop("upstream_sha")
+                self.save_receipt()
+                with self.assertRaisesRegex(RuntimeError, "Acceptance gate"):
+                    self.finish("merge")
+                self.assertEqual(len(self.rest_requests), 1)
+        self.request = original_request
+        self.save_receipt()
+        result = self.finish("merge")
+        self.assertEqual(result["upstream_sha"], upstream)
+        self.assertEqual(self.rest_requests[1]["payload"], original_payload)
+
+    def test_current_target_is_rechecked_before_comment_and_close(self):
+        self.make_upstream_candidate()
+        self.remove_target_on_containment = 2
+        with self.assertRaisesRegex(RuntimeError, "Current target"):
+            self.finish()
+        self.assertEqual(self.comments, [])
+        self.assertEqual(self.issue_state, "OPEN")
+        self.live_base = self.merge_sha
+        self.remove_target_on_containment = self.containment_calls + 3
+        with self.assertRaisesRegex(RuntimeError, "Current target"):
+            self.finish()
+        self.assertEqual(len(self.comments), 1)
+        self.assertEqual(self.issue_state, "OPEN")
+        self.live_base = self.merge_sha
+        self.assertTrue(self.finish()["closed"])
+
+    def test_closed_issue_resume_still_requires_current_target_containment(self):
+        self.make_upstream_candidate()
+        result = self.finish()
+        original_writes = copy.deepcopy(self.mutations)
+        self.live_base = self.base
+        with self.assertRaisesRegex(RuntimeError, "Current target"):
+            self.finish()
+        self.assertEqual(self.mutations, original_writes)
+        self.live_base = self.git("-c", "user.name=Delivery Test", "-c", "user.email=test@example.invalid",
+                                  "commit-tree", self.tree, "-p", self.merge_sha, "-m", "later unrelated feature")
+        resumed = self.finish()
+        self.assertEqual(resumed["merge_sha"], result["merge_sha"])
+        self.assertEqual(resumed["target_head_sha"], self.live_base)
+        self.assertEqual(self.mutations, original_writes)
+
+    def test_compare_requires_exact_base_common_ancestor_and_direction(self):
+        self.make_upstream_candidate()
+        for changed in ({"base_commit": {"sha": self.base}}, {"merge_base_commit": {"sha": self.base}},
+                        {"status": "behind"}, {"status": "diverged"}):
+            with self.subTest(changed=changed):
+                self.comparison_override = changed
+                with self.assertRaisesRegex(RuntimeError, "Current target"):
+                    self.finish()
+                self.assertEqual(self.comments, [])
+                self.assertEqual(self.issue_state, "OPEN")
+        self.comparison_override = {}
+        self.assertTrue(self.finish()["closed"])
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ import time
 import uuid
 from pathlib import Path
 
-from delivery import CleanupError, HERE, execute_checks, files_index, gh, live_candidate, output, read, run_id, terminate_tree, write
+from delivery import CleanupError, HERE, execute_checks, files_index, gh, live_candidate, output, read, run_id, terminate_tree, write, require_candidate_ancestry
 from review_gate import IDENTITY, digest, gate, review_model, spec_digest, validate_request, verify_files, repository_matches
 from review_protocol import axis_receipts, session_arguments, validate_session_model, read_events, response_models, message_blocks, skill_receipt
 
@@ -92,6 +92,7 @@ def review(config, incoming):
         evidence["dirty_before"] = output(["git", "status", "--porcelain"], checkout)
         if evidence["head_before"] != request["head_sha"]:
             raise RuntimeError("Checkout mismatch")
+        require_candidate_ancestry(request, checkout)
         for key, number in (("issue", request["issue"]), ("parent", request.get("parent_issue"))):
             if number is not None:
                 snapshot = gh(config, "issue", "view", str(number), "--json", "number,title,body,comments,state,updatedAt")
