@@ -226,7 +226,7 @@ export function TodayDashboard({
       ) : null}
 
       {!followupsLoading && !followupsError && upcoming.length > 0 && (
-        <Section icon={Bell} title="下次跟进" hint="尚未到期">
+        <Section icon={Bell} title="即将到期" hint="尚未到期">
           <ul className="grid gap-2">
             {upcoming.map((item) => (
               <li key={`${item.num ?? item.company}-${item.nextFollowupDate ?? ""}`}>
@@ -246,7 +246,7 @@ export function TodayDashboard({
 
       {/* B. Awaiting your decision */}
       {awaiting.length > 0 && (
-        <Section icon={CircleHelp} title="等待你的决定" hint="已评分，选择申请或跳过">
+        <Section icon={CircleHelp} title="等待你的决定" hint="按评分从高到低排列，选择申请或跳过">
           {recommended.length > 0 && (
             <Link
               href={`/pipeline/${recommended[0].n}`}
@@ -257,7 +257,7 @@ export function TodayDashboard({
           )}
           {awaitingGroups.map(([label, group]) => (
             <div key={label} className="mb-3">
-              <h3 className="mb-2 text-xs font-medium text-faint">{label}</h3>
+              <h3 className="mb-2 text-xs font-medium text-faint">{uiLabel(label)}</h3>
               <div className="grid gap-2.5 sm:grid-cols-2">
                 {group.map((a) => (
                   <DecisionCard key={a.n} app={a} reason={reasons[a.n]} />

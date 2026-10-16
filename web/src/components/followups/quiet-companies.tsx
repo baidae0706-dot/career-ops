@@ -53,7 +53,7 @@ export function QuietCompanies() {
     return (
       <section className="mt-8 rounded-2xl border border-border bg-surface/30 px-5 py-4">
         <Header courtesyDays={model.courtesyDays} />
-        <p className="mt-2 text-sm text-muted">{"没有超过期限仍无回复的公司"}{model.checked > 0 ? `，涉及 ${model.checked} 家公司` : ""}.
+        <p className="mt-2 text-sm text-muted">{"没有超过期限仍无回复的公司"}{model.checked > 0 ? `，涉及 ${model.checked} 家公司` : ""}。
         </p>
         {/* The caveats belong here MORE than on the populated panel, not less: an
             "all clear" drawn from a partial check is the reading most likely to
@@ -138,7 +138,7 @@ function Row({ c }: { c: QuietCompany }) {
           {c.role && <span className="text-muted"> · {c.role}</span>}
         </p>
         <p className="text-xs text-faint">
-          {c.days}{"天"}{"自"}{c.lastDate ?? "上次联系"}
+          距{c.lastDate ? `${c.lastDate} 的联系` : "上次联系"}已过 {c.days} 天
           {c.trackerNums.length > 0 && <span> · #{c.trackerNums.join(", #")}</span>}
         </p>
       </div>

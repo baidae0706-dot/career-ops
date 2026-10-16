@@ -62,7 +62,7 @@ export function CadenceSettings() {
       const raw = values[k].trim();
       const n = raw === "" ? Number.NaN : Number(raw);
       if (!Number.isInteger(n) || n < 0) {
-        setError(`"${FIELDS.find((f) => f.key === k)?.label}”必须是大于等于 0 的整数。`);
+        setError(`“${FIELDS.find((f) => f.key === k)?.label}”必须是大于等于 0 的整数。`);
         return;
       }
       payload[k] = n;

@@ -269,7 +269,7 @@ const ACTIONS: Record<string, ActionDef> = {
       const label = app ? `${app.company} · ${app.role}` : `#${n}`;
       return {
         status: "confirm",
-        summary: `标记为 ${label} → ${uiLabel(canon)}?`,
+        summary: `将 ${label} 的状态设为“${uiLabel(canon)}”？`,
         run: () => {
           ctx.writeStatus(n, canon);
           return { note: `已将 #${n} 标记为 ${uiLabel(canon)}。` };

@@ -67,7 +67,7 @@ test("assistant confirmation context and keyboard continuation during streaming"
     return target.evaluate((element) => document.activeElement === element);
   }
   const statusLabels = { Interview: "面试", Rejected: "被拒", Offer: "录用意向", Discarded: "已放弃" };
-  const summary = (n, status) => `标记为 #${n} → ${statusLabels[status]}?`;
+  const summary = (n, status) => `将 #${n} 的状态设为“${statusLabels[status]}”？`;
   const card = (n, status) => page.getByRole("group", { name: summary(n, status), exact: true });
   const decision = (verb, n, status) => page.getByRole("button", { name: `${verb === "Confirm" ? "确认" : "取消"}：${summary(n, status)}`, exact: true });
   const proposal = (n, status) => `\n<<act:setStatus ${JSON.stringify({ n, status })}>>`;

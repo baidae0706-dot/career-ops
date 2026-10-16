@@ -16,6 +16,13 @@ const LABELS: Record<string, string> = {
   "COMPANY SIZE": "公司规模", "BY ATS VENDOR": "按 ATS 服务商", RECOMMENDED: "推荐",
   APPLY: "建议申请", CONSIDER: "可以考虑", "RESEARCH FIRST": "先做调研",
   "FOLLOW-UPS": "跟进", "NEW MATCHES": "新匹配", "FOLLOW-UPS AND NEW MATCHES": "跟进与新匹配",
+  "STARTING…": "正在启动…", "DONE": "已完成", "FAILED TO START": "启动失败",
+  "CONNECTION ERROR": "连接错误", "INTERRUPTED (PAGE RELOADED)": "已中断（页面已刷新）",
+  "NO CLI CONFIGURED — OPEN CONFIG AND CLICK SAVE CONFIG": "尚未配置 CLI，请打开“设置”并点击“保存设置”",
+  "SIGN YOUR CLI IN FROM CONFIG, THEN RE-RUN.": "请在“设置”中登录你的 CLI，然后重新运行。",
+  "LOST CONNECTION TO THE LOCAL SERVER — RE-RUN.": "与本地服务器的连接已断开，请重新运行。",
+  "THE RUN WAS INTERRUPTED — RE-RUN IT.": "任务已中断，请重新运行。",
+  "NOT SCORED YET": "尚未评分", "CHECK THE POSTING FIRST": "先核实职位信息",
   "BELOW THE APPLY LINE": "低于申请推荐线", "NO SCORE": "尚无评分",
 };
 

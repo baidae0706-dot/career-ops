@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Check, X, Loader2, AlertTriangle } from "lucide-react";
 import type { Job } from "@/components/jobs/job-store";
 import { jobErrorHint } from "@/lib/job-error-hint.mjs";
+import { uiLabel } from "@/lib/ui-labels";
 import { cn } from "@/lib/cn";
 import { isFencingNotice } from "@/lib/cli-fencing.mjs";
 
@@ -22,7 +23,7 @@ const STEP_LABELS: Record<string, string> = {
   TodoWrite: "正在规划步骤",
   Task: "处理中",
 };
-const humanizeStep = (label: string): string => STEP_LABELS[label] ?? label;
+const humanizeStep = (label: string): string => STEP_LABELS[label] ?? uiLabel(label);
 
 // The unfenced-runtime notice is emitted as the run's FIRST step, before the CLI
 // produces any output — and this card renders only the newest step, so it would be
@@ -136,7 +137,7 @@ export function WorkerCard({
       )}
       {errorHint && (
         <div className={cn("mt-1 text-amber-700 dark:text-amber-400", inline ? "text-xs" : "text-[10px]")}>
-          {errorHint.text}
+          {uiLabel(errorHint.text)}
         </div>
       )}
       {fencing && (

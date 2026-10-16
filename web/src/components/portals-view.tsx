@@ -88,7 +88,7 @@ export function PortalsView({ watched }: { watched: WatchedCompany[] }) {
           {broken.length > 0 && (
             <div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm">
               <span className="font-medium text-red-700 dark:text-red-400">
-                {broken.length} {broken.length === 1 ? "家公司被跳过" : "家公司被跳过"}{"，每次扫描都无法包含它们"}</span>{" "}
+                {broken.length} {"家公司被跳过"}{"，每次扫描都无法包含它们"}</span>{" "}
               <span className="text-muted">{"。招聘链接已损坏，请修复"}<code>careers_url</code>{"，位于"}<code>portals.yml</code>{"（也可让助手修复）。"}</span>
             </div>
           )}

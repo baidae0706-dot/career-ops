@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import { ArrowLeft, Loader2, Wrench, CircleDot, Check, X } from "lucide-react";
 import { useJobs } from "@/components/jobs/job-store";
 import { HeroGlow } from "@/components/hero-glow";
+import { uiLabel } from "@/lib/ui-labels";
 import { Badge } from "@/components/ui/badge";
 
 export default function JobPage({ params }: { params: Promise<{ id: string }> }) {
@@ -61,7 +62,7 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
               <CircleDot className="mt-0.5 size-3.5 shrink-0 text-faint" />
             )}
             <span className={s.kind === "tool" ? "font-medium" : "text-muted"}>
-              {s.kind === "tool" ? `正在使用 ${s.label}` : s.label}
+              {s.kind === "tool" ? `正在使用 ${s.label}` : uiLabel(s.label)}
             </span>
           </li>
         ))}

@@ -18,7 +18,7 @@ import {
   type CadenceMetadata,
   type Urgency,
   daysHeatClass,
-  oxfordJoin,
+  joinDisplayList,
   relativeDays,
   urgencyRank,
   urgencyTone,
@@ -350,7 +350,7 @@ function NarrativeCard({ meta, entries }: { meta: CadenceMetadata; entries: Cade
   if (meta.overdue > 0) parts.push(`已逾期的跟进：${meta.overdue}`);
   if (meta.urgent > 0) parts.push(`紧急：${meta.urgent}`);
   if (pressing.length > 0) {
-    parts.push(`今日最紧急的事项：${oxfordJoin(pressing.map((e) => `${e.company} (#${e.num})`))}`);
+    parts.push(`今日最紧急的事项：${joinDisplayList(pressing.map((e) => `${e.company} (#${e.num})`))}`);
     const days = pressing.map((e) => e.daysSinceApplication);
     const max = Math.max(...days);
     parts.push(days.every((d) => d === max) ? `全部 ${max} 天（距申请）` : `最多 ${max} 天（距申请）`);

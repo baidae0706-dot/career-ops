@@ -32,8 +32,7 @@ test("Assistant keyboard continuation, semantic context and modeless behavior", 
     await page.context().route("**/api/logo?**", (route) => route.fulfill({ status: 204 }));
     await page.context().route("**/api/usage", (route) => route.fulfill({ json: {} }));
     await page.context().route("**/api/version", (route) => route.fulfill({ json: { version: "fixture" } }));
-    await page.addInitScript(() => localStorage.setItem("career-ops:config", JSON.stringify({ ...JSON.parse(localStorage.getItem("career-ops:config") || "{}"), logos: false })));
-    await page.addInitScript((cli) => { if (cli) localStorage.setItem("career-ops:config", JSON.stringify({ cliId: "fixture-cli", logos: false })); }, cli);
+    await page.addInitScript((cli) => localStorage.setItem("career-ops:config", JSON.stringify({ cliId: cli ? "fixture-cli" : "", logos: false })), cli);
     await page.route("**/api/**", (route) => {
       if (route.request().method() === "GET") return route.fallback();
       unexpected.push(route.request().url());

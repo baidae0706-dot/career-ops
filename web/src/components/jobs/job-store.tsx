@@ -70,7 +70,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
       const arr = raw ? JSON.parse(raw) : null;
       if (Array.isArray(arr)) {
         // anything left "running" from a previous session is stale → mark interrupted
-        setJobs(arr.map((j: Job) => (j.status === "running" ? { ...j, status: "error", steps: [...(j.steps || []), { kind: "status", label: "已中断（页面已刷新）", ts: Date.now() }] } : j)));
+        setJobs(arr.map((j: Job) => (j.status === "running" ? { ...j, status: "error", steps: [...(j.steps || []), { kind: "status", label: "Interrupted (page reloaded)", ts: Date.now() }] } : j)));
       }
     } catch {
       /* ignore */
@@ -104,7 +104,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
         kind: opts.kind,
         batchId: opts.batchId,
         status: "running",
-        steps: [{ kind: "status", label: "正在启动…", ts: Date.now() }],
+        steps: [{ kind: "status", label: "Starting…", ts: Date.now() }],
         text: "",
         startedAt: Date.now(),
       };
@@ -122,8 +122,8 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
         // choice without a record.
         const cliId = await resolveCliId((stale, replacement) => {
           const label = replacement
-            ? `已保存的 CLI “${stale}”未安装，改用“${replacement}'`
-            : `已保存的 CLI “${stale}”未安装`;
+            ? `Saved CLI '${stale}' is not installed — using '${replacement}'`
+            : `Saved CLI '${stale}' is not installed`;
           const step: JobStep = { kind: "status", label, ts: Date.now() };
           steps.push(step);
           patch(id, (j) => ({ ...j, steps: [...j.steps, step] }));
@@ -133,7 +133,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
             ...j,
             status: "error",
             endedAt: Date.now(),
-            steps: [...j.steps, { kind: "status", label: "尚未配置 CLI，请打开“设置”并点击“保存设置”", ts: Date.now() }],
+            steps: [...j.steps, { kind: "status", label: "No CLI configured — open Config and click Save config", ts: Date.now() }],
           }));
           return;
         }
@@ -177,7 +177,7 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
           });
           if (!res.ok || !res.body) {
             const e = await res.json().catch(() => ({}));
-            finish("error", e.error || "启动失败");
+            finish("error", e.error || "Failed to start");
             return;
           }
           const completion = await readJobStream(res.body, (ev) => {
@@ -202,9 +202,9 @@ export function JobsProvider({ children }: { children: React.ReactNode }) {
           doneTokens = completion.tokens ?? 0;
           doneCostUsd = completion.costUsd ?? null;
           doneReportN = typeof completion.reportN === "number" ? completion.reportN : null;
-          finish("done", "已完成");
+          finish("done", "Done");
         } catch {
-          finish("error", "连接错误");
+          finish("error", "Connection error");
         }
       })();
 

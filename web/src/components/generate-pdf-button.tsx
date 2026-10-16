@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { FileDown, Loader2, FileText, RotateCcw, TriangleAlert } from "lucide-react";
 import { useJobs } from "@/components/jobs/job-store";
+import { uiLabel } from "@/lib/ui-labels";
 import { CostBadge } from "@/components/cost/cost-badge";
 import { pdfButtonState, type PdfFailure } from "@/lib/pdf-button-state.mjs";
 
@@ -77,7 +78,7 @@ function FailureNote({ failure }: { failure: PdfFailure }) {
       className="inline-flex max-w-md items-start gap-1 text-xs text-red-700 hover:underline dark:text-red-400"
     >
       <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-      <span>简历未生成。 {failure.reason}</span>
+      <span>简历未生成。 {uiLabel(failure.reason)}</span>
     </Link>
   );
 }

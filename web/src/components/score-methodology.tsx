@@ -27,7 +27,7 @@ const BLOCKS: [string, string][] = [
 export function ScoreMethodology() {
   return (
     <details className="group mt-10 overflow-hidden rounded-2xl border border-border bg-surface/30">
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 text-sm font-medium transition-colors hover:bg-surface-hover">{"career-ops 如何评分，以及为什么适合"}<span className="text-landing">{"你"}</span>
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 text-sm font-medium transition-colors hover:bg-surface-hover">{"career-ops 如何评分，以及为什么适合你"}
         <ChevronDown className="ml-auto size-4 text-faint transition-transform group-open:rotate-180" />
       </summary>
       <div className="space-y-5 border-t border-border px-5 py-4 text-sm">
