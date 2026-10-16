@@ -11,12 +11,12 @@ import { cn } from "@/lib/cn";
 // followup-cadence.mjs reads the same keys — the CLI and the web must agree.
 
 const FIELDS: { key: ProfileCadenceKey; label: string; hint: string }[] = [
-  { key: "applied_first_days", label: "First follow-up", hint: "days after applying before the 1st nudge is due" },
-  { key: "applied_subsequent_days", label: "Between follow-ups", hint: "days between nudges while Applied" },
-  { key: "applied_max_followups", label: "Max follow-ups", hint: "after this many with no reply the lead goes cold" },
-  { key: "responded_initial_days", label: "Reply window", hint: "answer a company response within this many days" },
-  { key: "responded_subsequent_days", label: "Responded / assessment cadence", hint: "days between touches while in Responded or Assessment" },
-  { key: "interview_thankyou_days", label: "Thank-you note", hint: "due within this many days of reaching Interview" },
+  { key: "applied_first_days", label: "首次跟进", hint: "提交申请后多少天进行首次跟进" },
+  { key: "applied_subsequent_days", label: "跟进间隔", hint: "已申请期间，两次跟进相隔的天数" },
+  { key: "applied_max_followups", label: "最多跟进次数", hint: "达到此次数仍无回复，视为冷线索" },
+  { key: "responded_initial_days", label: "回复期限", hint: "在多少天内回复公司的消息" },
+  { key: "responded_subsequent_days", label: "已回复 / 测评阶段的跟进间隔", hint: "已回复或测评阶段，两次联系相隔的天数" },
+  { key: "interview_thankyou_days", label: "感谢信", hint: "进入面试阶段后，多少天内发送" },
 ];
 
 export function CadenceSettings() {
@@ -62,7 +62,7 @@ export function CadenceSettings() {
       const raw = values[k].trim();
       const n = raw === "" ? Number.NaN : Number(raw);
       if (!Number.isInteger(n) || n < 0) {
-        setError(`"${FIELDS.find((f) => f.key === k)?.label}" must be a whole number ≥ 0.`);
+        setError(`"${FIELDS.find((f) => f.key === k)?.label}”必须是大于等于 0 的整数。`);
         return;
       }
       payload[k] = n;
@@ -77,13 +77,13 @@ export function CadenceSettings() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(typeof j.error === "string" ? j.error : "Could not save.");
+        setError(typeof j.error === "string" ? j.error : "无法保存。");
       } else {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       }
     } catch {
-      setError("Could not save.");
+      setError("无法保存。");
     }
     setSaving(false);
   };
@@ -99,7 +99,7 @@ export function CadenceSettings() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(typeof j.error === "string" ? j.error : "Could not save.");
+        setError(typeof j.error === "string" ? j.error : "无法保存。");
       } else {
         setEnabled(next);
         // The nav is rendered on the server from the same setting. A router
@@ -107,39 +107,31 @@ export function CadenceSettings() {
         router.refresh();
       }
     } catch {
-      setError("Could not save.");
+      setError("无法保存。");
     }
     setToggling(false);
   };
 
   return (
     <div>
-      <label className="mt-8 mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-muted">
-        Follow-up cadence
-      </label>
+      <label className="mt-8 mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-muted">{"跟进频率"}</label>
       <div className="rounded-xl border border-border bg-surface/50 p-4">
-        <p className="text-xs leading-relaxed text-faint">
-          When the <span className="text-muted">Follow-ups</span> tracker nudges you. Saved to{" "}
-          <span className="font-mono text-muted">config/profile.yml</span> — the CLI uses the same values.
-        </p>
+        <p className="text-xs leading-relaxed text-faint">{"设置"}<span className="text-muted">{"跟进"}</span>{"页的提醒时间，保存到"}{" "}
+          <span className="font-mono text-muted">config/profile.yml</span>{"，CLI 使用相同配置。"}</p>
         {loadError ? (
           <div className="mt-3 text-sm text-muted">
-            <p className="text-red-500">
-              Couldn&apos;t read your current cadence settings — not showing defaults, to avoid overwriting real values in{" "}
+            <p className="text-red-500">{"无法读取当前跟进设置。为避免覆盖文件中的真实值，不展示默认设置："}{" "}
               <span className="font-mono">config/profile.yml</span>.
             </p>
             <button
               type="button"
               onClick={load}
               className="mt-2 rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium transition-colors hover:bg-surface-hover"
-            >
-              Retry
-            </button>
+            >{"重试"}</button>
           </div>
         ) : values === null ? (
           <div className="mt-3 flex items-center gap-2 text-sm text-muted">
-            <Loader2 className="size-4 animate-spin" /> Loading…
-          </div>
+            <Loader2 className="size-4 animate-spin" />{"加载中…"}</div>
         ) : (
           <>
             <label className="mt-3 flex items-center gap-2 text-sm font-medium text-foreground">
@@ -150,11 +142,11 @@ export function CadenceSettings() {
                 onChange={(e) => toggle(e.target.checked)}
                 className="size-4 accent-brand"
               />
-              Track follow-ups
+              跟进提醒
               {toggling && <Loader2 className="size-3.5 animate-spin" />}
             </label>
             <p className="mt-0.5 text-xs text-faint">
-              Off hides the Follow-ups page and stops scheduling follow-up dates. Saved as{" "}
+              关闭后隐藏跟进页面，并停止安排跟进日期。保存为{" "}
               <span className="font-mono text-muted">follow_ups.enabled</span>.
             </p>
             {enabled && (
@@ -185,7 +177,7 @@ export function CadenceSettings() {
                   )}
                 >
                   {saving ? <Loader2 className="size-3.5 animate-spin" /> : saved ? <Check className="size-3.5 text-emerald-400" /> : null}
-                  {saved ? "Saved" : "Save cadence"}
+                  {saved ? "已保存" : "保存跟进频率"}
                 </button>
               </>
             )}

@@ -43,17 +43,17 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
   // Stream the ingest, parsing markers live.
   const runStream = useCallback(async (init: RequestInit) => {
     setPhase("parsing");
-    setTrace("Reading your CV…");
+    setTrace("正在读取简历…");
     setErr("");
     try {
       const r = await fetch("/api/cv/ingest", init);
       if (r.status === 404) {
-        setErr("Connect an AI CLI in Config first — it parses your CV locally.");
+        setErr("请先在“设置”中连接 AI CLI，用它解析简历。");
         setPhase("error");
         return;
       }
       if (!r.body) {
-        setErr("No response.");
+        setErr("没有响应。");
         setPhase("error");
         return;
       }
@@ -66,17 +66,17 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
         buf += dec.decode(value, { stream: true });
         const parsed = parseCvStream(buf);
         if (parsed.error) {
-          setErr(parsed.error === "unreadable" ? "I couldn't read text from that file (it may be a scanned image). Paste the text instead." : "Couldn't parse the CV — paste the text instead.");
+          setErr(parsed.error === "unreadable" ? "无法从文件中读取文字，可能是扫描图片。请粘贴文字。" : "无法解析简历，请改为粘贴文字。");
           setPhase("error");
           return;
         }
-        if (parsed.trace) setTrace(parsed.trace.split("\n").filter(Boolean).slice(-1)[0] || "Reading your CV…");
+        if (parsed.trace) setTrace(parsed.trace.split("\n").filter(Boolean).slice(-1)[0] || "正在读取简历…");
         if (parsed.markdown) setMd(parsed.markdown);
         if (parsed.seed) setSeed(parsed.seed);
       }
       const final = parseCvStream(buf);
       if (!final.markdown.trim()) {
-        setErr("Couldn't read a CV there — paste the text instead.");
+        setErr("无法读取简历，请改为粘贴文字。");
         setPhase("error");
         return;
       }
@@ -92,7 +92,7 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
   const ingestText = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) {
-      setErr("That looks empty — paste your CV instead.");
+      setErr("内容为空，请粘贴简历。");
       setPhase("error");
       return;
     }
@@ -115,7 +115,7 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
         .text()
         .then((t) => {
           if (!t.trim()) {
-            setErr("That file looks empty — paste your CV instead.");
+            setErr("文件为空，请粘贴简历。");
             setPhase("error");
             return;
           }
@@ -124,7 +124,7 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
           setPhase("review");
         })
         .catch(() => {
-          setErr("Couldn't read that file — paste your CV instead.");
+          setErr("无法读取文件，请改为粘贴简历。");
           setPhase("error");
         });
       return;
@@ -145,7 +145,7 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
   const [saveErr, setSaveErr] = useState("");
   const save = async () => {
     if (!md.trim()) {
-      setSaveErr("Your CV looks empty — paste it again.");
+      setSaveErr("简历内容为空，请重新粘贴。");
       return;
     }
     setSaveErr("");
@@ -154,12 +154,12 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
       const r = await fetch("/api/cv", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: md }) });
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
-        setSaveErr(d.error || "Couldn't save your CV — try again.");
+        setSaveErr(d.error || "无法保存简历，请重试。");
         setPhase("review"); // keep the parsed CV so they don't lose it
         return;
       }
     } catch {
-      setSaveErr("Couldn't save your CV — check your connection and try again.");
+      setSaveErr("无法保存简历，请检查连接后重试。");
       setPhase("review");
       return;
     }
@@ -201,7 +201,7 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && paste.trim()) ingestText(paste.trim());
             }}
-            placeholder="Paste your CV here — or drop a PDF / .md file below. Even a rough paste works; we'll clean it up."
+            placeholder="在这里粘贴简历，或在下方上传 PDF / .md 文件。即使格式粗略，也能帮你整理。"
             className="h-32 w-full resize-none bg-transparent text-[14px] leading-relaxed outline-none placeholder:text-faint"
           />
           <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border pt-3">
@@ -210,19 +210,16 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
               onClick={() => fileRef.current?.click()}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface/50 px-3 py-1.5 text-xs font-medium text-foreground transition hover:border-brand/40 hover:text-brand max-sm:min-h-[44px] max-sm:px-4"
             >
-              <Upload className="size-3.5" /> Upload PDF / file
-            </button>
+              <Upload className="size-3.5" />{"上传 PDF / 文件"}</button>
             <input ref={fileRef} type="file" accept=".pdf,.md,.markdown,.txt,.docx" hidden onChange={(e) => e.target.files?.[0] && ingestFile(e.target.files[0])} />
             <span className="inline-flex items-center gap-1 text-[11px] text-faint">
-              <Lock className="size-3" /> Stays on your machine. Parsed by your own AI.
-            </span>
+              <Lock className="size-3" />{"文件保存在本机，由你自己的 AI 解析。"}</span>
             <button
               type="button"
               disabled={!paste.trim()}
               onClick={() => ingestText(paste.trim())}
               className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground shadow-sm transition hover:brightness-110 disabled:opacity-50 max-sm:min-h-[44px]"
-            >
-              Read my CV <ArrowRight className="size-4" />
+            >{"读取我的简历"}<ArrowRight className="size-4" />
             </button>
           </div>
         </div>
@@ -230,9 +227,8 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
           (err === "needs-cli" ? (
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-[13px] text-amber-700 dark:text-amber-300">
               <AlertTriangle className="size-3.5 shrink-0" />
-              <span>To read a PDF or Word file, connect an AI CLI in Config. Paste or drop .md / .txt to start without one.</span>
-              <Link href="/config" className="ml-auto inline-flex items-center gap-1 rounded-md bg-amber-500/20 px-2.5 py-1 font-medium text-amber-700 transition hover:bg-amber-500/30 dark:text-amber-200">
-                Connect your AI CLI <ArrowRight className="size-3.5" />
+              <span>{"读取 PDF 或 Word 需要先在“设置”中连接 AI CLI。粘贴文字或上传 .md / .txt 则可直接开始。"}</span>
+              <Link href="/config" className="ml-auto inline-flex items-center gap-1 rounded-md bg-amber-500/20 px-2.5 py-1 font-medium text-amber-700 transition hover:bg-amber-500/30 dark:text-amber-200">{"连接你的 AI CLI"}<ArrowRight className="size-3.5" />
               </Link>
             </div>
           ) : (
@@ -251,11 +247,10 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
         <style>{STYLE}</style>
         <div className="flex items-center gap-2.5">
           <Loader2 className="size-4 animate-spin text-brand" />
-          <span className={`${instrumentSerif.className} text-lg text-foreground`}>{trace || "Reading your CV…"}</span>
+          <span className={`${instrumentSerif.className} text-lg text-foreground`}>{trace || "正在读取简历…"}</span>
         </div>
         <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-          <span className="size-1.5 rounded-full bg-emerald-500" /> 0 tokens · $0.00 · local
-        </div>
+          <span className="size-1.5 rounded-full bg-emerald-500" />{"0 Token · $0.00 · 本地"}</div>
         {md && <div className="co-cvtrace mt-4 max-h-40 overflow-hidden rounded-lg border border-border bg-surface/40 p-3 text-[11px] text-faint">{md.slice(0, 400)}…</div>}
       </div>
     );
@@ -267,7 +262,7 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
       <style>{STYLE}</style>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <FileText className="size-4 text-brand" />
-        <h3 className={`${instrumentSerif.className} text-lg text-foreground`}>Here&apos;s your CV — review and save</h3>
+        <h3 className={`${instrumentSerif.className} text-lg text-foreground`}>{"这是你的简历，请核对并保存"}</h3>
         {readiness && (
           <span
             className={cn(
@@ -276,7 +271,7 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
             )}
           >
             {readiness.scoreable ? <Check className="size-3" /> : <AlertTriangle className="size-3" />}
-            {readiness.scoreable ? "Ready to match" : "A bit thin"}
+            {readiness.scoreable ? "可以开始匹配" : "内容略少"}
           </span>
         )}
       </div>
@@ -303,9 +298,7 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
           disabled={phase === "saving"}
           className="inline-flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground shadow-sm transition hover:brightness-110 disabled:opacity-60"
         >
-          {phase === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-          Save &amp; find my matches
-        </button>
+          {phase === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}{"保存并查找匹配职位"}</button>
         <button
           type="button"
           onClick={() => {
@@ -315,11 +308,9 @@ export function CvIngest({ onSaved }: { onSaved?: () => void }) {
           }}
           className="inline-flex items-center gap-1.5 text-[13px] text-muted transition hover:text-foreground"
         >
-          <RotateCcw className="size-3.5" /> Start over
-        </button>
+          <RotateCcw className="size-3.5" />{"重新开始"}</button>
         <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-faint">
-          <Lock className="size-3" /> Saved locally to cv.md
-        </span>
+          <Lock className="size-3" />{"已保存到本机 cv.md"}</span>
       </div>
     </div>
   );

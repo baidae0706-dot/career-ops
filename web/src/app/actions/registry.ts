@@ -1,3 +1,4 @@
+import { uiLabel } from "@/lib/ui-labels";
 // The ONE action registry — the single source of truth for "what can be done".
 // Both UI controls and the assistant dispatch the SAME entries via dispatch(),
 // so the human UI and the agentic UI can never drift. Pure module (no React
@@ -150,7 +151,7 @@ const ACTIONS: Record<string, ActionDef> = {
       const ex = ctx.jobForUrl(url);
       if (ex && ex.status !== "error" && !raw.rerun) return { status: "ignored", note: "already evaluated" };
       const id = ctx.startJob({
-        title: isStr(raw.title) ? String(raw.title) : "Evaluate",
+        title: isStr(raw.title) ? String(raw.title) : "评估",
         subtitle: isStr(raw.subtitle) ? String(raw.subtitle) : undefined,
         kind: "evaluate",
         input: url,
@@ -186,7 +187,7 @@ const ACTIONS: Record<string, ActionDef> = {
       if (pending.length === 0) {
         return {
           status: "ignored",
-          note: matches.length > 0 ? `Already evaluated every ${company} posting.` : `No pending ${company} postings in your inbox.`,
+          note: matches.length > 0 ? `已评估所有 ${company} 的职位。` : `待评估列表中没有 ${company} 的职位。`,
         };
       }
 
@@ -195,7 +196,7 @@ const ACTIONS: Record<string, ActionDef> = {
         const ids = pending
           .map((j) =>
             ctx.startJob({
-              title: `Evaluate · ${j.company}`,
+              title: `评估 · ${j.company}`,
               subtitle: j.role,
               kind: "evaluate",
               input: j.url,
@@ -211,7 +212,7 @@ const ACTIONS: Record<string, ActionDef> = {
       const estimate = ctx.estimateCost?.("evaluate", pending.length) ?? {};
       return {
         status: "confirm",
-        summary: formatBatchSpendConfirmation(`Evaluate ${pending.length} ${company} postings`, pending.length, estimate),
+        summary: formatBatchSpendConfirmation(`评估 ${pending.length} ${company} 个职位`, pending.length, estimate),
         run: fire,
       };
     },
@@ -227,7 +228,7 @@ const ACTIONS: Record<string, ActionDef> = {
       const merge = raw.merge === true;
       ctx.push("/explore");
       ctx.applyExplore(raw, { merge, run });
-      return { status: "done", note: run ? "Scanning the ATS network for fresh roles (free)…" : "Opened Explore with your filters." };
+      return { status: "done", note: run ? "正在免费扫描 ATS 网络中的新职位…" : "已按你的筛选条件打开“探索”。" };
     },
   },
 
@@ -237,7 +238,7 @@ const ACTIONS: Record<string, ActionDef> = {
       const target = raw.target;
       if (!isStr(target)) return { status: "ignored", note: "missing target" };
       const id = ctx.startJob({
-        title: isStr(raw.title) ? String(raw.title) : "Research",
+        title: isStr(raw.title) ? String(raw.title) : "调研",
         kind: "research",
         input: target,
         page: "/pipeline",
@@ -252,7 +253,7 @@ const ACTIONS: Record<string, ActionDef> = {
       const n = String(raw.n ?? "").trim();
       if (!n) return { status: "ignored", note: "need an application #" };
       const app = ctx.applications.find((a) => a.n === n);
-      const id = ctx.startJob({ title: `CV PDF · ${app?.company ?? `#${n}`}`, subtitle: "tailored CV", kind: "pdf", input: n, page: `/pipeline/${n}` });
+      const id = ctx.startJob({ title: `简历 PDF · ${app?.company ?? `#${n}`}`, subtitle: "定制简历", kind: "pdf", input: n, page: `/pipeline/${n}` });
       return { status: "done", jobIds: id ? [id] : [] };
     },
   },
@@ -268,10 +269,10 @@ const ACTIONS: Record<string, ActionDef> = {
       const label = app ? `${app.company} · ${app.role}` : `#${n}`;
       return {
         status: "confirm",
-        summary: `Mark ${label} → ${canon}?`,
+        summary: `标记为 ${label} → ${uiLabel(canon)}?`,
         run: () => {
           ctx.writeStatus(n, canon);
-          return { note: `Marked #${n} as ${canon}.` };
+          return { note: `已将 #${n} 标记为 ${uiLabel(canon)}。` };
         },
       };
     },
@@ -283,7 +284,7 @@ const ACTIONS: Record<string, ActionDef> = {
       const url = raw.url;
       if (!isStr(url) || !/^https?:\/\//i.test(url)) return { status: "ignored", note: "need an application form URL" };
       ctx.startApply(url);
-      return { status: "done", note: "Opening the application form…" };
+      return { status: "done", note: "正在打开申请表…" };
     },
   },
 
@@ -294,7 +295,7 @@ const ACTIONS: Record<string, ActionDef> = {
       const value = raw.value;
       if (!isStr(field) || typeof value !== "string") return { status: "ignored", note: "need a field and a value" };
       ctx.setApplyField(String(field), value);
-      return { status: "done", note: `Updated "${field}".` };
+      return { status: "done", note: `已更新“${field}”。` };
     },
   },
 
@@ -318,14 +319,14 @@ const ACTIONS: Record<string, ActionDef> = {
       const p = coerceProfile(raw);
       const has = Object.values(p).some((v) => (Array.isArray(v) ? v.length : v !== undefined));
       if (!has) return { status: "ignored", note: "nothing to save" };
-      const bits = [p.roles?.length ? `roles: ${p.roles.join(", ")}` : "", p.location ? `in ${p.location}` : "", p.compMin && p.compMax ? `comp ${p.compMin}–${p.compMax}` : ""].filter(Boolean).join(" · ");
+      const bits = [p.roles?.length ? `职位：${p.roles.join(", ")}` : "", p.location ? `地点：${p.location}` : "", p.compMin && p.compMax ? `薪酬：${p.compMin}–${p.compMax}` : ""].filter(Boolean).join(" · ");
       return {
         status: "confirm",
-        summary: `Save your profile?${bits ? ` (${bits})` : ""}`,
+        summary: `保存你的求职资料？${bits ? ` (${bits})` : ""}`,
         run: () => {
           ctx.writeProfile!(p as Record<string, unknown>);
           if (p.roles?.length) ctx.writePortals?.(p.roles, p.location ? [p.location] : undefined);
-          return { note: "Profile saved — your matches will sharpen." };
+          return { note: "求职资料已保存，匹配结果会更精准。" };
         },
       };
     },
@@ -363,10 +364,10 @@ const ACTIONS: Record<string, ActionDef> = {
       const location = Array.isArray(raw.location) ? raw.location.filter((l): l is string => typeof l === "string") : undefined;
       return {
         status: "confirm",
-        summary: `Set your scan targets to: ${roles.join(", ")}?`,
+        summary: `将扫描目标设为：${roles.join(", ")}?`,
         run: () => {
           ctx.writePortals!(roles, location);
-          return { note: "Scan targets updated." };
+          return { note: "扫描目标已更新。" };
         },
       };
     },
@@ -379,10 +380,10 @@ export function actionExists(id: string): boolean {
 
 export function dispatch(id: string, rawArgs: Record<string, unknown>, ctx: ActionCtx): DispatchResult {
   const def = ACTIONS[id];
-  if (!def) return { status: "ignored", note: `unknown action: ${id}` };
+  if (!def) return { status: "ignored", note: `未知操作：${id}` };
   try {
     return def.run(rawArgs ?? {}, ctx);
   } catch {
-    return { status: "ignored", note: `could not run ${id}` };
+    return { status: "ignored", note: `无法执行 ${id}` };
   }
 }

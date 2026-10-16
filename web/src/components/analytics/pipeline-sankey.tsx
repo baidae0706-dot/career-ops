@@ -1,3 +1,4 @@
+import { uiLabel } from "@/lib/ui-labels";
 import { buildPipelineSankey, layoutSankey } from "@/lib/pipeline-sankey.mjs";
 import { cn } from "@/lib/cn";
 
@@ -34,19 +35,14 @@ export function PipelineSankey({
   const graph = buildPipelineSankey(applications, statusLog);
   const layout = layoutSankey(graph, { width: 920, height: 440, padding: { top: 24, right: 188, bottom: 24, left: 100 } });
   const toneById = new Map(layout.nodes.map((n) => [n.id, n.tone]));
-  const labelById = new Map(graph.nodes.map((n) => [n.id, n.label]));
+  const labelById = new Map(graph.nodes.map((n) => [n.id, uiLabel(n.label)]));
   const firstRank = Math.min(...layout.nodes.map((n) => n.rank));
   const lastRank = Math.max(...layout.nodes.map((n) => n.rank));
 
   return (
     <section id="pipeline-sankey" className="mt-10 scroll-mt-8" aria-labelledby="sankey-heading">
-      <h2 id="sankey-heading" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-        Pipeline Sankey
-      </h2>
-      <p className="mt-2 max-w-2xl text-sm text-muted">
-        Current tracker snapshot. Status-log transitions keep interview-then-reject
-        on the interview path — a later Rejected does not erase the stage.
-      </p>
+      <h2 id="sankey-heading" className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">{"求职进展桑基图"}</h2>
+      <p className="mt-2 max-w-2xl text-sm text-muted">{"当前跟踪记录快照。状态历史会保留面试后的拒绝路径；后续被拒不会抹去曾进入的阶段。"}</p>
 
       <div className="mt-4 overflow-x-auto rounded-xl border border-border bg-surface/50 p-3">
         <svg
@@ -55,11 +51,9 @@ export function PipelineSankey({
           role="img"
           aria-labelledby="sankey-title sankey-desc"
         >
-          <title id="sankey-title">Application pipeline Sankey</title>
+          <title id="sankey-title">{"求职进展桑基图"}</title>
           <desc id="sankey-desc">
-            {graph.total} tracked roles flowing from tracked through submitted to waiting,
-            company-engaged, and terminal outcomes.
-          </desc>
+            {graph.total}{"个职位从已记录流向已提交、等待回复、公司互动及最终结果。"}</desc>
 
           {layout.links.map((link) => {
             const tone = toneById.get(link.source) ?? "neutral";
@@ -67,7 +61,7 @@ export function PipelineSankey({
             const targetLabel = labelById.get(link.target) ?? link.target;
             return (
               <g key={`${link.source}-${link.target}`}>
-                <title>{`${link.value} roles: ${sourceLabel} → ${targetLabel}`}</title>
+                <title>{`${link.value} 个职位：${sourceLabel} → ${targetLabel}`}</title>
                 <path d={link.d} className={cn(TONE_LINK[tone] ?? TONE_LINK.neutral, "outline-none")} />
               </g>
             );
@@ -81,7 +75,7 @@ export function PipelineSankey({
             const anchor = labelOnRight ? "start" : "end";
             return (
               <g key={node.id}>
-                <title>{`${node.label}: ${node.value}`}</title>
+                <title>{`${uiLabel(node.label)}: ${node.value}`}</title>
                 <rect
                   x={node.x}
                   y={node.y}
@@ -100,7 +94,7 @@ export function PipelineSankey({
                   strokeWidth={4}
                   paintOrder="stroke"
                 >
-                  {node.label}
+                  {uiLabel(node.label)}
                   <tspan className="fill-muted font-normal" stroke="var(--bg)" strokeWidth={4} paintOrder="stroke">
                     {`  ${node.value}`}
                   </tspan>
@@ -113,12 +107,12 @@ export function PipelineSankey({
 
       <div className="sr-only">
         <table>
-          <caption>Pipeline Sankey flows</caption>
+          <caption>求职进展流向</caption>
           <thead>
             <tr>
-              <th>From</th>
-              <th>To</th>
-              <th>Roles</th>
+              <th>起点</th>
+              <th>终点</th>
+              <th>职位数</th>
             </tr>
           </thead>
           <tbody>

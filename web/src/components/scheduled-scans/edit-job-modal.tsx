@@ -68,7 +68,7 @@ export function EditJobModal({
       onUpdated();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error updating job");
+      setError(err instanceof Error ? err.message : "更新任务时出错");
     } finally {
       setSubmitting(false);
     }
@@ -82,13 +82,14 @@ export function EditJobModal({
               <Edit3 className="size-5" />
             </div>
             <div>
-              <h2 id="edit-scheduled-scan-title" className="text-lg font-semibold text-foreground">Edit Scheduled Scan</h2>
-              <p className="text-xs text-muted">Update name, filters, schedule, and location scope.</p>
+              <h2 id="edit-scheduled-scan-title" className="text-lg font-semibold text-foreground">{"编辑定时扫描"}</h2>
+              <p className="text-xs text-muted">{"修改名称、筛选条件、时间安排和地点范围。"}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
+            aria-label="关闭"
             className="rounded-lg p-1.5 text-faint transition-colors hover:bg-surface-hover hover:text-foreground"
           >
             <X className="size-5" />
@@ -100,22 +101,24 @@ export function EditJobModal({
 
           {/* ─── Name + Engine + Cadence ─── */}
           <div>
-            <label className="mb-1 block text-[13px] font-medium text-foreground">Scan Name</label>
+            <label className="mb-1 block text-[13px] font-medium text-foreground">{"扫描名称"}</label>
             <input
               ref={nameRef}
+              aria-label="扫描名称"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
               className="w-full rounded-xl border border-border bg-surface-hover/60 px-3.5 py-2 text-sm text-foreground outline-none focus:border-brand/60 focus:ring-2 focus:ring-brand/20"
-              placeholder="e.g. Roles matching my profile"
+              placeholder="例如：匹配我求职资料的岗位"
             />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-[13px] font-medium text-foreground">Scan Engine</label>
+              <label className="mb-1 block text-[13px] font-medium text-foreground">{"扫描引擎"}</label>
               <select
+                aria-label="扫描引擎"
                 value={engine}
                 onChange={(e) => {
                   const nextEngine = e.target.value as ScanEngine;
@@ -124,22 +127,24 @@ export function EditJobModal({
                 }}
                 className="w-full rounded-xl border border-border bg-surface-hover/60 px-3.5 py-2 text-sm text-foreground outline-none focus:border-brand/60"
               >
-                <option value="full">Full ATS Dataset Sweep</option>
-                <option value="portals">Zero-Token Portals.yml</option>
+                <option value="full">{"完整 ATS 数据集扫描"}</option>
+                <option value="portals">{"招聘门户（Portals.yml）"}</option>
               </select>
             </div>
 
             <div>
-              <label className="mb-1 block text-[13px] font-medium text-foreground">Repeat Cadence</label>
+              <label className="mb-1 block text-[13px] font-medium text-foreground">{"重复间隔"}</label>
               <div className="flex gap-2">
                 <input
                   type="number"
                   min={cadenceMinimum(unit)}
+                  aria-label="重复间隔"
                   value={every}
                   onChange={(e) => setEvery(Math.max(cadenceMinimum(unit), Number(e.target.value)))}
                   className="w-20 rounded-xl border border-border bg-surface-hover/60 px-3.5 py-2 text-sm text-foreground outline-none focus:border-brand/60"
                 />
                 <select
+                  aria-label="时间单位"
                   value={unit}
                   onChange={(e) => {
                     const nextUnit = e.target.value as "minutes" | "hours" | "days";
@@ -148,9 +153,9 @@ export function EditJobModal({
                   }}
                   className="flex-1 rounded-xl border border-border bg-surface-hover/60 px-3.5 py-2 text-sm text-foreground outline-none focus:border-brand/60"
                 >
-                  <option value="hours">Hours</option>
-                  <option value="days">Days</option>
-                  <option value="minutes">Minutes</option>
+                  <option value="hours">{"小时"}</option>
+                  <option value="days">{"天"}</option>
+                  <option value="minutes">{"分钟"}</option>
                 </select>
               </div>
             </div>
@@ -167,16 +172,14 @@ export function EditJobModal({
               type="button"
               onClick={onClose}
               className="rounded-xl border border-border px-4 py-2 text-xs font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
-            >
-              Cancel
-            </button>
+            >{"取消"}</button>
             <button
               type="submit"
               disabled={submitting}
               className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-xs font-medium text-brand-foreground shadow transition-colors hover:bg-brand-200 disabled:opacity-50"
             >
               {submitting ? <Loader2 className="size-4 animate-spin" /> : <Edit3 className="size-4" />}
-              {submitting ? "Saving…" : "Save Changes"}
+              {submitting ? "保存中…" : "保存修改"}
             </button>
           </div>
         </form>

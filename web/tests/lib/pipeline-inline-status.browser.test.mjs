@@ -23,9 +23,13 @@ test("inline Pipeline status browser flow (disposable data only)", { skip: !url 
   const initial = fs.readFileSync(tracker, "utf8");
   assert.ok(initial.includes("Fixture Alpha") && initial.includes("Fixture Beta") && initial.includes("Fixture Gamma"));
   const { chromium } = await import("playwright-core");
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const browser = await chromium.launch({ channel: process.env.CAREER_OPS_TEST_BROWSER_CHANNEL || "chrome", headless: true });
   t.after(() => browser.close());
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await page.context().route("**/api/logo?**", (route) => route.fulfill({ status: 204 }));
+  await page.context().route("**/api/usage", (route) => route.fulfill({ json: {} }));
+  await page.context().route("**/api/version", (route) => route.fulfill({ json: { version: "fixture" } }));
+  await page.addInitScript(() => localStorage.setItem("career-ops:config", JSON.stringify({ ...JSON.parse(localStorage.getItem("career-ops:config") || "{}"), logos: false })));
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   // Missing fixture resources and the deliberately injected HTTP 503 are
@@ -38,8 +42,9 @@ test("inline Pipeline status browser flow (disposable data only)", { skip: !url 
     if (request.url().endsWith("/api/status") && request.method() === "POST") posts.push(request.postDataJSON());
   });
   const row = (n) => page.locator("tbody tr").filter({ has: page.getByRole("link", { name: `#${n}`, exact: true }) });
-  const tab = (name) => page.getByRole("button", { name: new RegExp(`^${name} \\d+$`) });
-  const edit = (n) => row(n).getByRole("button", { name: /^Edit status/ });
+  const tabLabels = { INBOX: "待评估", ALL: "全部", EVALUATED: "已评估", APPLIED: "已申请" };
+  const tab = (name) => page.getByRole("button", { name: new RegExp(`^${tabLabels[name] ?? name} \\d+$`) });
+  const edit = (n) => row(n).getByRole("button", { name: /^编辑状态/ });
   const select = (n) => row(n).getByRole("combobox");
   async function until(check) {
     const start = Date.now();
@@ -52,7 +57,7 @@ test("inline Pipeline status browser flow (disposable data only)", { skip: !url 
   await page.goto(`${origin.origin}/pipeline?tab=ALL`);
   await edit(11).waitFor();
   assert.equal(await page.locator("tbody tr").count(), 3);
-  assert.equal(await page.getByRole("button", { name: /^Edit status/ }).count(), 3);
+  assert.equal(await page.getByRole("button", { name: /^编辑状态/ }).count(), 3);
 
   await t.test("pencil, Cancel, Escape and same-value selection do not write", async () => {
     await edit(11).focus();
@@ -60,7 +65,7 @@ test("inline Pipeline status browser flow (disposable data only)", { skip: !url 
     assert.equal(await select(11).evaluate((element) => document.activeElement === element), true);
     assert.equal(await page.getByRole("combobox").count(), 1);
     await select(11).selectOption("Evaluated");
-    await row(11).getByRole("button", { name: /^Cancel editing/ }).click();
+    await row(11).getByRole("button", { name: /^取消编辑/ }).click();
     await edit(11).waitFor();
     await until(() => edit(11).evaluate((element) => document.activeElement === element));
     await edit(11).click();
@@ -72,7 +77,7 @@ test("inline Pipeline status browser flow (disposable data only)", { skip: !url 
 
   await t.test("sorting preserves the open editor and other rows remain usable", async () => {
     await edit(11).click();
-    await page.getByRole("button", { name: "company", exact: true }).click();
+    await page.getByRole("button", { name: "公司", exact: true }).click();
     await page.waitForURL(/sort=company/);
     await select(11).waitFor();
     assert.equal(await row(12).getByRole("combobox").count(), 0);
@@ -89,9 +94,9 @@ test("inline Pipeline status browser flow (disposable data only)", { skip: !url 
     await edit(11).click();
     await select(11).selectOption("Applied");
     assert.equal(await select(11).isDisabled(), true);
-    assert.equal(await row(11).getByRole("button", { name: /^Cancel editing/ }).isDisabled(), true);
+    assert.equal(await row(11).getByRole("button", { name: /^取消编辑/ }).isDisabled(), true);
     assert.equal(await edit(12).isEnabled(), true);
-    await page.getByPlaceholder("Search company or role…").fill("Fixture");
+    await page.getByPlaceholder("搜索公司或岗位…").fill("Fixture");
     release();
     await row(11).getByRole("alert").waitFor();
     assert.equal(await select(11).inputValue(), "Evaluated");
@@ -118,8 +123,8 @@ test("inline Pipeline status browser flow (disposable data only)", { skip: !url 
     await edit(11).click();
     await select(11).selectOption("Applied");
     await until(() => row(11).count().then((count) => count === 0));
-    await until(() => tab("EVALUATED").innerText().then((text) => /^EVALUATED\s+1$/.test(text)));
-    assert.match(await tab("APPLIED").innerText(), /^APPLIED\s+2$/);
+    await until(() => tab("EVALUATED").innerText().then((text) => /^已评估\s+1$/.test(text)));
+    assert.match(await tab("APPLIED").innerText(), /^已申请\s+2$/);
     assert.equal(await tab("EVALUATED").evaluate((element) => document.activeElement === element), true);
     await until(() => held);
     assert.match(fs.readFileSync(tracker, "utf8"), /Fixture Alpha.*Applied/);
@@ -129,7 +134,7 @@ test("inline Pipeline status browser flow (disposable data only)", { skip: !url 
     assert.equal(await row(11).count(), 0);
     await tab("APPLIED").click();
     await edit(11).waitFor();
-    assert.match(await row(11).innerText(), /Applied/);
+    assert.match(await row(11).innerText(), /已申请/);
     assert.match(fs.readFileSync(path.join(root, "data/status-log.tsv"), "utf8"), /11\t.*Evaluated\tApplied\tweb/);
   });
 
@@ -141,15 +146,15 @@ test("inline Pipeline status browser flow (disposable data only)", { skip: !url 
     await page.route("**/api/status", async (route) => { await gate; await route.continue(); });
     await edit(13).click();
     await select(13).selectOption("Interview");
-    const search = page.getByPlaceholder("Search company or role…");
+    const search = page.getByPlaceholder("搜索公司或岗位…");
     await search.fill("Fixture Beta");
     assert.equal(await row(13).count(), 0);
     release();
     await until(() => fs.readFileSync(tracker, "utf8").includes("3.6/5 | Interview"));
     await page.unroute("**/api/status");
-    assert.match(await row(12).innerText(), /Applied/);
+    assert.match(await row(12).innerText(), /已申请/);
     await search.fill("");
-    await until(() => row(13).innerText().then((text) => text.includes("Interview")));
+    await until(() => row(13).innerText().then((text) => text.includes("面试")));
   });
 
   await t.test("independent row saves may finish out of order without crossing identities", async (subtest) => {
@@ -164,24 +169,24 @@ test("inline Pipeline status browser flow (disposable data only)", { skip: !url 
     await select(12).selectOption("Offer");
     await edit(13).click();
     await select(13).selectOption("Rejected");
-    await until(() => row(13).innerText().then((text) => text.includes("Rejected")));
+    await until(() => row(13).innerText().then((text) => text.includes("被拒")));
     assert.equal(await select(12).isDisabled(), true);
     release();
     await until(() => fs.readFileSync(tracker, "utf8").includes("3.8/5 | Offer"));
     await page.unrouteAll({ behavior: "wait" });
     await page.reload();
-    assert.match(await row(12).innerText(), /Offer/);
-    assert.match(await row(13).innerText(), /Rejected/);
+    assert.match(await row(12).innerText(), /录用意向/);
+    assert.match(await row(13).innerText(), /被拒/);
   });
 
   await t.test("detail-page dropdown retains the saved animation and persists", async () => {
     await page.goto(`${origin.origin}/pipeline/11`);
-    const detailSelect = page.getByLabel("status", { exact: true });
+    const detailSelect = page.getByLabel("状态", { exact: true });
     await detailSelect.waitFor();
     assert.equal(await detailSelect.inputValue(), "Applied");
-    assert.equal(await page.getByRole("button", { name: /^Edit status/ }).count(), 0);
+    assert.equal(await page.getByRole("button", { name: /^编辑状态/ }).count(), 0);
     await detailSelect.selectOption("Responded");
-    await page.locator(".animate-terminal-popup").filter({ hasText: "saved" }).waitFor();
+    await page.locator(".animate-terminal-popup").filter({ hasText: "已保存" }).waitFor();
     await page.reload();
     assert.equal(await detailSelect.inputValue(), "Responded");
   });
@@ -192,11 +197,11 @@ test("inline Pipeline status browser flow (disposable data only)", { skip: !url 
     await edit(11).click();
     await select(11).waitFor();
     assert.equal(await select(11).evaluate((element) => element.getBoundingClientRect().height >= 44), true);
-    assert.equal(await row(11).getByRole("button", { name: /^Cancel editing/ }).evaluate((element) => element.getBoundingClientRect().height >= 44), true);
+    assert.equal(await row(11).getByRole("button", { name: /^取消编辑/ }).evaluate((element) => element.getBoundingClientRect().height >= 44), true);
     await select(11).press("Escape");
     await tab("INBOX").click();
     await page.waitForURL((value) => !value.searchParams.has("tab"));
-    assert.equal(await page.getByRole("button", { name: /^Edit status/ }).count(), 0);
+    assert.equal(await page.getByRole("button", { name: /^编辑状态/ }).count(), 0);
   });
   assert.deepEqual(errors, []);
 });

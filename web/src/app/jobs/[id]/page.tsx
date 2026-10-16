@@ -18,11 +18,8 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
     return (
       <div className="mx-auto max-w-3xl px-6 py-10">
         <Link href="/pipeline" className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-brand">
-          <ArrowLeft className="size-4" /> Pipeline
-        </Link>
-        <p className="mt-8 text-sm text-muted">
-          This worker is no longer in memory (it finished earlier or the page was reloaded).
-        </p>
+          <ArrowLeft className="size-4" />{"求职进展"}</Link>
+        <p className="mt-8 text-sm text-muted">{"此任务已不在内存中（已完成或页面已刷新）。"}</p>
       </div>
     );
   }
@@ -30,19 +27,18 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
   return (
     <div className="mx-auto max-w-3xl px-6 py-8">
       <Link href="/pipeline" className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-brand">
-        <ArrowLeft className="size-4" /> Pipeline
-      </Link>
+        <ArrowLeft className="size-4" />{"求职进展"}</Link>
 
       <section className="dot-bg relative mt-5 overflow-hidden rounded-2xl border border-border bg-surface/40 px-6 py-7">
         {job.status === "running" && <HeroGlow />}
         <div className="relative z-10">
           <p className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-faint">
             {job.status === "running" ? (
-              <><Loader2 className="size-3 animate-spin text-brand" /> working</>
+              <><Loader2 className="size-3 animate-spin text-brand" />{"运行中"}</>
             ) : job.status === "done" ? (
-              <><Check className="size-3 text-emerald-500" /> done</>
+              <><Check className="size-3 text-emerald-500" />{"已完成"}</>
             ) : (
-              <><X className="size-3 text-red-400" /> error</>
+              <><X className="size-3 text-red-400" />{"错误"}</>
             )}
           </p>
           <h1 className="mt-2 font-display text-2xl tracking-tight text-landing">{job.title}</h1>
@@ -65,20 +61,19 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
               <CircleDot className="mt-0.5 size-3.5 shrink-0 text-faint" />
             )}
             <span className={s.kind === "tool" ? "font-medium" : "text-muted"}>
-              {s.kind === "tool" ? `Using ${s.label}` : s.label}
+              {s.kind === "tool" ? `正在使用 ${s.label}` : s.label}
             </span>
           </li>
         ))}
         {job.status === "running" && (
           <li className="flex items-center gap-2.5 text-sm text-muted">
-            <Loader2 className="size-3.5 animate-spin text-brand" /> thinking…
-          </li>
+            <Loader2 className="size-3.5 animate-spin text-brand" />{"思考中…"}</li>
         )}
       </ol>
 
       {job.text && (
         <div className="mt-8">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">Output</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">{"输出"}</h2>
           <div className="report-prose mt-3 rounded-2xl border border-border bg-surface/40 p-5">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{job.text}</ReactMarkdown>
           </div>

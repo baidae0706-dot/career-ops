@@ -1,5 +1,7 @@
 "use client";
 
+import { uiLabel } from "@/lib/ui-labels";
+
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -35,15 +37,15 @@ const URGENCY_TABS = ["ALL", "OVERDUE", "URGENT", "WAITING", "COLD"] as const;
 type UrgencyTab = (typeof URGENCY_TABS)[number];
 
 const COLUMNS = [
-  { key: "company", label: "Company" },
-  { key: "role", label: "Role" },
-  { key: "score", label: "Score" },
-  { key: "status", label: "Status" },
-  { key: "urgency", label: "Urgency" },
-  { key: "days", label: "Days since app" },
-  { key: "next", label: "Next follow-up" },
-  { key: "count", label: "Follow-ups done" },
-  { key: "since", label: "Days since F/U" },
+  { key: "company", label: "公司" },
+  { key: "role", label: "岗位" },
+  { key: "score", label: "评分" },
+  { key: "status", label: "状态" },
+  { key: "urgency", label: "紧急程度" },
+  { key: "days", label: "申请后天数" },
+  { key: "next", label: "下次跟进" },
+  { key: "count", label: "已跟进次数" },
+  { key: "since", label: "上次跟进后天数" },
 ] as const;
 type SortKey = (typeof COLUMNS)[number]["key"];
 const SORT_KEYS = COLUMNS.map((c) => c.key);
@@ -177,10 +179,10 @@ export function FollowupsView() {
       });
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
-        setActionError(typeof j.error === "string" ? `Couldn't remove the follow-up: ${j.error}` : "Couldn't remove the follow-up.");
+        setActionError(typeof j.error === "string" ? `无法删除跟进记录：${j.error}` : "无法删除跟进记录。");
       }
     } catch {
-      setActionError("Couldn't remove the follow-up.");
+      setActionError("无法删除跟进记录。");
     }
     refetch();
   };
@@ -195,26 +197,24 @@ export function FollowupsView() {
 
   const subtitle = !data ? (
     <span className="inline-flex items-center gap-1.5">
-      <Loader2 className="size-3.5 animate-spin" /> Computing cadence…
-    </span>
+      <Loader2 className="size-3.5 animate-spin" />{"正在计算跟进频率…"}</span>
   ) : !data.available || !meta ? (
-    "Cadence unavailable"
+    "无法获取跟进频率"
   ) : (
     <>
-      <span className="tabular-nums">{meta.actionable}</span> active ·{" "}
-      <span className="tabular-nums">{meta.urgent}</span> urgent ·{" "}
-      <span className="tabular-nums">{meta.overdue}</span> overdue
-    </>
+      <span className="tabular-nums">{meta.actionable}</span>{"活跃 ·"}{" "}
+      <span className="tabular-nums">{meta.urgent}</span>{"紧急 ·"}{" "}
+      <span className="tabular-nums">{meta.overdue}</span>{"已逾期"}</>
   );
 
   return (
     <div className="mx-auto max-w-none px-6 py-8">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl tracking-tight text-landing">Follow-up Tracker</h1>
+          <h1 className="font-display text-2xl tracking-tight text-landing">{"跟进记录"}</h1>
           <p className="mt-1 text-sm text-muted">{subtitle}</p>
           <p className="mt-2 max-w-3xl text-xs leading-relaxed text-faint">
-            Use <span className="font-medium text-muted">Log</span> after you actually send an email, LinkedIn message, or call. The count and next date update automatically; status changes recalculate urgency, while <span className="font-medium text-muted">Next date</span> lets you pin a custom reminder.
+            实际发送邮件、LinkedIn 消息或拨打电话后，使用 <span className="font-medium text-muted">记录</span> 。跟进次数与下次日期会自动更新；更改状态会重新计算紧急程度。使用 <span className="font-medium text-muted">下次日期</span> 可固定自定义提醒。
           </p>
         </div>
         <div className="relative w-56 max-w-[35vw]">
@@ -222,7 +222,7 @@ export function FollowupsView() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search company or role…"
+            placeholder="搜索公司或岗位…"
             className="w-full rounded-md border border-border bg-surface/60 py-2 pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-faint focus:border-brand/50 focus-visible:ring-2 focus-visible:ring-brand/40"
           />
         </div>
@@ -243,7 +243,7 @@ export function FollowupsView() {
                 tab === t ? "border-brand text-foreground" : "border-transparent text-muted hover:text-foreground",
               )}
             >
-              {t} <span className="text-faint tabular-nums">{count}</span>
+              {uiLabel(t)} <span className="text-faint tabular-nums">{count}</span>
             </button>
           );
         })}
@@ -252,19 +252,19 @@ export function FollowupsView() {
       {actionError && <p className="mt-3 text-xs text-red-500">{actionError}</p>}
 
       {!data ? null : !data.available ? (
-        <EmptyPanel title="Cadence unavailable" body="The cadence engine (followup-cadence.mjs) returned nothing — check that the core scripts are present." />
+        <EmptyPanel title="无法获取跟进安排" body="跟进引擎 followup-cadence.mjs 没有返回数据，请检查核心脚本是否存在。" />
       ) : !isPending && filtered.length === 0 ? (
         filtering ? (
-          <EmptyPanel title="No matches" body="Try a different urgency filter or clear the search." />
+          <EmptyPanel title="没有匹配结果" body="尝试其他紧急程度筛选，或清除搜索。" />
         ) : (
-          <EmptyPanel title="Nothing to chase" body="No active applications need a follow-up. Apply to roles (or update statuses) and the cadence starts tracking them." />
+          <EmptyPanel title="暂无待跟进事项" body="没有需要跟进的活跃申请。申请职位或更新状态后，将开始计算跟进安排。" />
         )
       ) : (
         <div className="mt-4 overflow-x-auto rounded-2xl border border-border">
           <table className="w-full min-w-[880px] text-sm">
             <thead className="bg-surface/60 text-left text-xs uppercase tracking-wide text-faint">
               <tr>
-                <th className="w-8 px-2 py-2.5" aria-label="Expand" />
+                <th className="w-8 px-2 py-2.5" aria-label="展开" />
                 {COLUMNS.map((c) => {
                   const active = sortKey === c.key;
                   return (
@@ -286,7 +286,7 @@ export function FollowupsView() {
                     </th>
                   );
                 })}
-                <th className="px-2.5 py-2.5 font-medium">Action</th>
+                <th className="px-2.5 py-2.5 font-medium">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border" aria-busy={isPending}>
@@ -309,8 +309,8 @@ export function FollowupsView() {
 
       {data?.available && upcoming.length > 0 && (
         <section className="mt-8">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted">Upcoming</h2>
-          <p className="mt-1 text-xs text-faint">These have a next date and are not due yet.</p>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted">即将到期</h2>
+          <p className="mt-1 text-xs text-faint">这些申请已安排下次跟进日期，目前尚未到期。</p>
           <ul className="mt-3 divide-y divide-border rounded-2xl border border-border">
             {upcoming.map((entry) => (
               <li key={entry.num} className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3 text-sm">
@@ -347,13 +347,13 @@ function NarrativeCard({ meta, entries }: { meta: CadenceMetadata; entries: Cade
     .slice(0, 4);
 
   const parts: string[] = [];
-  if (meta.overdue > 0) parts.push(`Overdue follow-ups: ${meta.overdue}`);
-  if (meta.urgent > 0) parts.push(`Urgent: ${meta.urgent}`);
+  if (meta.overdue > 0) parts.push(`已逾期的跟进：${meta.overdue}`);
+  if (meta.urgent > 0) parts.push(`紧急：${meta.urgent}`);
   if (pressing.length > 0) {
-    parts.push(`most pressing today: ${oxfordJoin(pressing.map((e) => `${e.company} (#${e.num})`))}`);
+    parts.push(`今日最紧急的事项：${oxfordJoin(pressing.map((e) => `${e.company} (#${e.num})`))}`);
     const days = pressing.map((e) => e.daysSinceApplication);
     const max = Math.max(...days);
-    parts.push(days.every((d) => d === max) ? `all ${max} days since applied` : `up to ${max} days since applied`);
+    parts.push(days.every((d) => d === max) ? `全部 ${max} 天（距申请）` : `最多 ${max} 天（距申请）`);
   }
 
   return (
@@ -395,7 +395,7 @@ function FollowupRow({
             type="button"
             onClick={onToggle}
             aria-expanded={expanded}
-            aria-label={`${expanded ? "Hide" : "Show"} follow-up history for ${e.company}`}
+            aria-label={`${expanded ? "隐藏" : "显示"} 跟进历史：${e.company}`}
             className="rounded p-1 text-faint transition hover:text-foreground"
           >
             <Chevron className="size-4" />
@@ -424,9 +424,9 @@ function FollowupRow({
         <td className="px-2.5 py-3">
           <Badge
             tone={urgencyTone(e.urgency)}
-            title="Urgency is calculated from status, follow-up history, and the next follow-up date"
+            title="紧急程度根据状态、跟进历史和下次跟进日期计算"
           >
-            {e.urgency}
+            {uiLabel(e.urgency)}
           </Badge>
         </td>
         <td className={cn("px-2.5 py-3 tabular-nums", daysHeatClass(e.daysSinceApplication))}>{e.daysSinceApplication}</td>
@@ -441,8 +441,8 @@ function FollowupRow({
           {e.nextOverride && (
             <span
               className="ml-1.5 inline-flex align-[-1px]"
-              title={`Pinned to ${e.nextOverride} — cleared when you log a follow-up`}
-              aria-label="Pinned manually"
+              title={`固定为 ${e.nextOverride}，记录跟进后会清除`}
+              aria-label="手动固定"
             >
               <Pin className="size-3 text-brand" />
             </span>
@@ -457,23 +457,21 @@ function FollowupRow({
             <button
               type="button"
               onClick={onLog}
-              title="Log a follow-up (date, channel, contact, notes)"
+              title="记录跟进（日期、渠道、联系人、备注）"
               className="rounded-md px-2 py-1 text-xs font-medium text-muted transition-colors hover:bg-brand-soft hover:text-brand"
-            >
-              Log
-            </button>
+            >{"记录"}</button>
             <button
               type="button"
               onClick={onPin}
-              aria-label={e.nextOverride ? `Change next follow-up date for ${e.company}` : `Set next follow-up date for ${e.company}`}
-              title={e.nextOverride ? `Next date pinned to ${e.nextOverride} — change or clear` : "Pin a custom next follow-up date"}
+              aria-label={e.nextOverride ? `修改 ${e.company} 的下次跟进日期` : `设置 ${e.company} 的下次跟进日期`}
+              title={e.nextOverride ? `下次日期已固定为 ${e.nextOverride}，可修改或清除` : "固定下次跟进日期"}
               className={cn(
                 "rounded-md p-1 transition-colors hover:bg-brand-soft hover:text-brand",
                 e.nextOverride ? "text-brand" : "text-faint",
               )}
             >
               <CalendarClock className="size-3.5" />
-              <span className="hidden xl:inline">Next date</span>
+              <span className="hidden xl:inline">下次日期</span>
             </button>
           </span>
         </td>
@@ -496,7 +494,7 @@ function HistoryPanel({ entry: e, onRemove }: { entry: CadenceEntry; onRemove: (
   return (
     <div className="space-y-2 pl-7 text-sm">
       {history.length === 0 ? (
-        <p className="text-faint">No follow-ups logged yet.</p>
+        <p className="text-faint">{"尚无跟进记录。"}</p>
       ) : (
         <ul className="space-y-1.5">
           {history.map((f, i) => (
@@ -508,8 +506,8 @@ function HistoryPanel({ entry: e, onRemove }: { entry: CadenceEntry; onRemove: (
                   <button
                     type="button"
                     onClick={() => onRemove(f.num!)}
-                    title="Remove this logged follow-up (added by mistake?)"
-                    aria-label={`Remove follow-up logged ${f.date}`}
+                    title="移除此跟进记录（是否误添加？）"
+                    aria-label={`移除跟进记录，日期：${f.date}`}
                     className="rounded p-0.5 text-faint opacity-0 transition group-hover/item:opacity-100 hover:text-red-500 focus-visible:opacity-100"
                   >
                     <Trash2 className="size-3.5" />
@@ -517,7 +515,7 @@ function HistoryPanel({ entry: e, onRemove }: { entry: CadenceEntry; onRemove: (
                 )}
               </span>
               <span className="tabular-nums text-muted">{f.date}</span>
-              <Badge tone="muted">{f.channel}</Badge>
+              <Badge tone="muted">{uiLabel(f.channel)}</Badge>
               {f.contact && <span className="text-muted">{f.contact}</span>}
               {f.notes && <span className="text-faint">{f.notes}</span>}
             </li>
@@ -525,8 +523,7 @@ function HistoryPanel({ entry: e, onRemove }: { entry: CadenceEntry; onRemove: (
         </ul>
       )}
       {e.contacts.length > 0 && (
-        <p className="text-xs text-faint">
-          Suggested contacts:{" "}
+        <p className="text-xs text-faint">{"建议联系人："}{" "}
           {e.contacts.map((c, i) => (
             <span key={c.email}>
               {i > 0 && ", "}

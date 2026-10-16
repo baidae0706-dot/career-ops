@@ -10,6 +10,7 @@ export const inter = localFont({
   }],
   variable: "--font-inter",
   display: "swap",
+  fallback: ["Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "sans-serif"],
 });
 
 // Editorial display — Instrument Serif. Regular and italic mirror the docs
@@ -22,6 +23,7 @@ export const instrumentSerif = localFont({
   }],
   variable: "--font-instrument-serif",
   display: "swap",
+  fallback: ["Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "sans-serif"],
 });
 
 export const instrumentSerifItalic = localFont({
@@ -32,4 +34,5 @@ export const instrumentSerifItalic = localFont({
   }],
   variable: "--font-instrument-serif-italic",
   display: "swap",
+  fallback: ["Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "sans-serif"],
 });

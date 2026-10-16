@@ -1,5 +1,7 @@
 "use client";
 
+import { uiLabel } from "@/lib/ui-labels";
+
 import { useEffect, useState } from "react";
 import { progressModel } from "@/lib/analytics/view-model.mjs";
 
@@ -34,7 +36,7 @@ export function FunnelRates() {
   if (state === "loading") {
     return (
       <section className="mt-10">
-        <h2 className="font-display text-lg text-landing">Conversion</h2>
+        <h2 className="font-display text-lg text-landing">{"转化率"}</h2>
         <div className="mt-4 grid gap-3" aria-hidden>
           {/* Inline rather than a shared Skeleton primitive: this branch is
               independent of the route-loading work, so it carries no dependency
@@ -61,11 +63,8 @@ export function FunnelRates() {
   if (state === "unavailable") {
     return (
       <section className="mt-10">
-        <h2 className="font-display text-lg text-landing">Conversion</h2>
-        <p className="mt-3 rounded-2xl border border-dashed border-border bg-surface/30 px-5 py-6 text-sm text-muted">
-          Nothing to convert yet — these rates come from applications you have
-          sent. Apply to a role and the funnel fills in here.
-        </p>
+        <h2 className="font-display text-lg text-landing">{"转化率"}</h2>
+        <p className="mt-3 rounded-2xl border border-dashed border-border bg-surface/30 px-5 py-6 text-sm text-muted">{"暂无转化数据。这些比率来自你已提交的申请；申请职位后，这里会显示漏斗数据。"}</p>
       </section>
     );
   }
@@ -76,9 +75,8 @@ export function FunnelRates() {
   return (
     <section className="mt-10">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="font-display text-lg text-landing">Conversion</h2>
-        <p className="text-xs text-faint">
-          Cumulative — reaching a stage counts every stage before it, matching{" "}
+        <h2 className="font-display text-lg text-landing">{"转化率"}</h2>
+        <p className="text-xs text-faint">{"累计计算：进入某阶段时，之前的所有阶段也计入，与以下工具一致："}{" "}
           <code className="text-muted">stats.mjs</code>
         </p>
       </div>
@@ -86,15 +84,13 @@ export function FunnelRates() {
       {model.provisional && (
         // stats.mjs's own smallSample flag. Said plainly, because three
         // percentages off a handful of applications look like a finding.
-        <p className="mt-2 text-xs text-muted">
-          Small sample so far — these rates will move a lot with each new outcome.
-        </p>
+        <p className="mt-2 text-xs text-muted">{"当前样本较少，每个新结果都可能使比率明显变化。"}</p>
       )}
 
       <div className="mt-4 grid gap-2.5">
         {stages.map((s) => (
           <div key={s.key} className="flex items-center gap-3">
-            <span className="w-24 shrink-0 text-sm text-muted">{s.label}</span>
+            <span className="w-24 shrink-0 text-sm text-muted">{uiLabel(s.label)}</span>
             <div className="h-4 flex-1 overflow-hidden rounded-full bg-surface">
               <div className="h-full rounded-full bg-brand/70" style={{ width: `${(s.value / top) * 100}%` }} />
             </div>
@@ -106,7 +102,7 @@ export function FunnelRates() {
       <dl className="mt-5 grid grid-cols-3 gap-3">
         {rates.map((r) => (
           <div key={r.key} className="rounded-xl border border-border bg-surface/40 px-3.5 py-3">
-            <dt className="text-xs text-muted">{r.label}</dt>
+            <dt className="text-xs text-muted">{uiLabel(r.label)}</dt>
             <dd className="mt-0.5 text-xl tabular-nums text-foreground">
               {/* null, not 0: a rate with nothing to divide by is absent. An
                   em dash says "not yet" where "0%" would say "failing". */}

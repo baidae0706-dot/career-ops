@@ -21,22 +21,29 @@ test("assistant confirmation context and keyboard continuation during streaming"
   await new Promise((resolve) => fixture.listen(0, "127.0.0.1", resolve));
   t.after(() => { response?.end(); fixture.closeAllConnections(); fixture.close(); });
   const { chromium } = await import("playwright-core");
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const browser = await chromium.launch({ channel: process.env.CAREER_OPS_TEST_BROWSER_CHANNEL || "chrome", headless: true });
   t.after(() => browser.close());
   const page = await browser.newPage();
+  await page.context().route("**/api/logo?**", (route) => route.fulfill({ status: 204 }));
+  await page.context().route("**/api/usage", (route) => route.fulfill({ json: {} }));
+  await page.context().route("**/api/version", (route) => route.fulfill({ json: { version: "fixture" } }));
+  await page.addInitScript(() => localStorage.setItem("career-ops:config", JSON.stringify({ ...JSON.parse(localStorage.getItem("career-ops:config") || "{}"), logos: false })));
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Accessibility.enable");
   const writes = [];
   const unexpected = [];
-  await page.addInitScript(() => localStorage.setItem("career-ops:config", JSON.stringify({ cliId: "fixture-cli" })));
+  await page.addInitScript(() => localStorage.setItem("career-ops:config", JSON.stringify({ cliId: "fixture-cli", logos: false })));
   await page.route("**/api/**", async (route) => {
     if (route.request().method() !== "GET") {
       unexpected.push(route.request().url());
       return route.abort();
     }
-    return route.continue();
+    return route.fallback();
   });
   await page.route("**/api/assistant/chats**", (route) => route.fulfill({ json: route.request().method() === "PUT" ? { revision: 1, title: "Fictional audit" } : { chats: [], errors: [] } }));
+  // Keep unresolved-number proposals deterministic; scratch tracker hydration
+  // must not race the intended #n confirmation context.
+  await page.route("**/api/pipeline", (route) => route.fulfill({ json: { applications: [], inbox: [] } }));
   await page.route("**/api/status", (route) => {
     writes.push(route.request().postDataJSON());
     return route.fulfill({ json: { ok: true } });
@@ -59,13 +66,14 @@ test("assistant confirmation context and keyboard continuation during streaming"
   async function focused(target) {
     return target.evaluate((element) => document.activeElement === element);
   }
-  const summary = (n, status) => `Mark #${n} → ${status}?`;
+  const statusLabels = { Interview: "面试", Rejected: "被拒", Offer: "录用意向", Discarded: "已放弃" };
+  const summary = (n, status) => `标记为 #${n} → ${statusLabels[status]}?`;
   const card = (n, status) => page.getByRole("group", { name: summary(n, status), exact: true });
-  const decision = (verb, n, status) => page.getByRole("button", { name: `${verb}: ${summary(n, status)}`, exact: true });
+  const decision = (verb, n, status) => page.getByRole("button", { name: `${verb === "Confirm" ? "确认" : "取消"}：${summary(n, status)}`, exact: true });
   const proposal = (n, status) => `\n<<act:setStatus ${JSON.stringify({ n, status })}>>`;
 
   await page.goto(`${origin.origin}/pipeline?tab=ALL`);
-  const open = page.getByRole("button", { name: "Open assistant", exact: true });
+  const open = page.getByRole("button", { name: "打开助手", exact: true });
   await open.waitFor();
   await tabTo(open);
   await page.keyboard.press("Enter");
@@ -76,7 +84,7 @@ test("assistant confirmation context and keyboard continuation during streaming"
   await page.keyboard.press("Enter");
   await until(() => response);
   response.write("Please review these changes." + proposal("11", "Interview") + proposal("12", "Rejected"));
-  await until(() => page.getByRole("button", { name: /^Confirm/ }).count().then((count) => count === 2));
+  await until(() => page.getByRole("button", { name: /^确认/ }).count().then((count) => count === 2));
   assert.equal(await decision("Cancel", "11", "Interview").count(), 1);
   await decision("Confirm", "12", "Rejected").waitFor();
   assert.equal(await focused(input), true, "proposal arrival must not steal focus");
@@ -90,7 +98,7 @@ test("assistant confirmation context and keyboard continuation during streaming"
   for (const [n, status] of [["11", "Interview"], ["12", "Rejected"]]) {
     assert.equal(visible.filter((node) => node.role?.value === "group" && node.name?.value === summary(n, status)).length, 1);
     for (const verb of ["Confirm", "Cancel"]) {
-      assert.equal(visible.filter((node) => node.role?.value === "button" && node.name?.value === `${verb}: ${summary(n, status)}`).length, 1);
+      assert.equal(visible.filter((node) => node.role?.value === "button" && node.name?.value === `${verb === "Confirm" ? "确认" : "取消"}：${summary(n, status)}`).length, 1);
     }
   }
 
@@ -98,10 +106,10 @@ test("assistant confirmation context and keyboard continuation during streaming"
   await page.keyboard.press("Enter");
   const cancelled = card("11", "Interview").locator('[tabindex="-1"]');
   await until(() => focused(cancelled));
-  assert.equal(await cancelled.innerText(), "cancelled");
+  assert.equal(await cancelled.innerText(), "已取消");
   assert.deepEqual(writes, []);
   const cancelledTree = await cdp.send("Accessibility.getFullAXTree");
-  assert.ok(cancelledTree.nodes.some((node) => !node.ignored && node.name?.value === `${summary("11", "Interview")} cancelled` && node.properties?.some((p) => p.name === "focused" && p.value.value === true)));
+  assert.ok(cancelledTree.nodes.some((node) => !node.ignored && node.name?.value === `${summary("11", "Interview")} 已取消` && node.properties?.some((p) => p.name === "focused" && p.value.value === true)));
 
   // More streamed text must preserve both card identity and result focus.
   response.write(" More explanation while the response continues.");
@@ -112,10 +120,10 @@ test("assistant confirmation context and keyboard continuation during streaming"
   await page.keyboard.press("Space");
   const started = card("12", "Rejected").locator('[tabindex="-1"]');
   await until(() => focused(started));
-  assert.equal(await started.innerText(), "✓ started");
+  assert.equal(await started.innerText(), "✓ 已启动");
   assert.deepEqual(writes, [{ n: "12", status: "Rejected" }]);
   const startedTree = await cdp.send("Accessibility.getFullAXTree");
-  assert.ok(startedTree.nodes.some((node) => !node.ignored && node.name?.value === `${summary("12", "Rejected")} ✓ started` && node.properties?.some((p) => p.name === "focused" && p.value.value === true)));
+  assert.ok(startedTree.nodes.some((node) => !node.ignored && node.name?.value === `${summary("12", "Rejected")} ✓ 已启动` && node.properties?.some((p) => p.name === "focused" && p.value.value === true)));
 
   // Automation activating a control while the user is elsewhere must not
   // relocate that user's focus. Both decisions keep the existing callback gate.
@@ -123,14 +131,14 @@ test("assistant confirmation context and keyboard continuation during streaming"
   await decision("Cancel", "13", "Offer").waitFor();
   await tabTo(input);
   await decision("Cancel", "13", "Offer").evaluate((button) => button.click());
-  await card("13", "Offer").getByText("cancelled", { exact: true }).waitFor();
+  await card("13", "Offer").getByText("已取消", { exact: true }).waitFor();
   assert.equal(await focused(input), true);
   await decision("Confirm", "14", "Discarded").evaluate((button) => button.click());
-  await card("14", "Discarded").getByText("✓ started", { exact: true }).waitFor();
+  await card("14", "Discarded").getByText("✓ 已启动", { exact: true }).waitFor();
   assert.equal(await focused(input), true);
   assert.deepEqual(writes, [{ n: "12", status: "Rejected" }, { n: "14", status: "Discarded" }]);
   response.end();
-  await until(() => page.getByRole("button", { name: "New chat", exact: true }).isEnabled());
+  await until(() => page.getByRole("button", { name: "新对话", exact: true }).isEnabled());
   assert.equal(await focused(input), true);
   for (const [n, status] of [["11", "Interview"], ["12", "Rejected"], ["13", "Offer"], ["14", "Discarded"]]) {
     assert.equal(await card(n, status).locator('[aria-live], [role="status"], [role="alert"]').count(), 0, "focused result is not also live-announced");

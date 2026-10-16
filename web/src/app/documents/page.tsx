@@ -24,7 +24,7 @@ export default function DocumentsPage() {
   useEffect(() => {
     fetch("/api/documents")
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to load documents");
+        if (!res.ok) throw new Error("无法加载文档");
         return res.json();
       })
       .then((data) => {
@@ -32,7 +32,7 @@ export default function DocumentsPage() {
         setError(null);
       })
       .catch((err) => {
-        setError(err.message || "Something went wrong");
+        setError(err.message || "发生错误");
       })
       .finally(() => {
         setLoading(false);
@@ -53,14 +53,14 @@ export default function DocumentsPage() {
         <div className="mb-4 rounded-full bg-red-500/10 p-3 text-red-500">
           <File className="h-6 w-6" />
         </div>
-        <h2 className="text-lg font-medium text-foreground">Failed to load</h2>
+        <h2 className="text-lg font-medium text-foreground">加载失败</h2>
         <p className="mt-1 text-sm text-muted">{error}</p>
         <Button
           variant="outline"
           className="mt-4"
           onClick={() => window.location.reload()}
         >
-          Try again
+          重试
         </Button>
       </div>
     );
@@ -72,9 +72,9 @@ export default function DocumentsPage() {
         <div className="mb-4 rounded-full bg-surface-hover p-3 text-muted">
           <FileText className="h-6 w-6" />
         </div>
-        <h2 className="text-lg font-medium text-foreground">No documents found</h2>
+        <h2 className="text-lg font-medium text-foreground">暂无文档</h2>
         <p className="mt-1 text-sm text-muted">
-          Generated CVs and cover letters will appear here.
+          生成的简历和求职信将显示在这里。
         </p>
       </div>
     );
@@ -84,10 +84,10 @@ export default function DocumentsPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Documents
+          文档
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Browse your generated CVs and cover letters.
+          浏览已生成的简历和求职信。
         </p>
       </div>
 
@@ -114,7 +114,7 @@ export default function DocumentsPage() {
               
               <div className="mt-4 flex flex-wrap gap-2">
                 <Badge tone="info" className="capitalize">
-                  {doc.kind === "cv" ? "CV" : doc.kind === "cover" ? "Cover Letter" : "Document"}
+                  {doc.kind === "cv" ? "简历" : doc.kind === "cover" ? "求职信" : "文档"}
                 </Badge>
                 {doc.date && (
                   <Badge tone="muted" className="flex items-center gap-1 font-normal">
@@ -136,7 +136,7 @@ export default function DocumentsPage() {
                 className="w-full justify-between"
                 onClick={() => window.open(`/api/documents?id=${doc.id}`, "_blank")}
               >
-                Open PDF
+                打开 PDF
                 <ExternalLink className="h-4 w-4 text-muted" />
               </Button>
             </div>

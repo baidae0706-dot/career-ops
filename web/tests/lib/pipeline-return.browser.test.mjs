@@ -17,16 +17,20 @@ test("Pipeline detail links preserve the list context", { skip: !url || !root, t
   assert.ok(relative && !relative.startsWith("..") && !path.isAbsolute(relative));
   assert.equal(fs.readFileSync(path.join(root, ".inline-status-fixture"), "utf8").trim(), "fictional-only");
   const { chromium } = await import("playwright-core");
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const browser = await chromium.launch({ channel: process.env.CAREER_OPS_TEST_BROWSER_CHANNEL || "chrome", headless: true });
   t.after(() => browser.close());
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await page.context().route("**/api/logo?**", (route) => route.fulfill({ status: 204 }));
+  await page.context().route("**/api/usage", (route) => route.fulfill({ json: {} }));
+  await page.context().route("**/api/version", (route) => route.fulfill({ json: { version: "fixture" } }));
+  await page.addInitScript(() => localStorage.setItem("career-ops:config", JSON.stringify({ ...JSON.parse(localStorage.getItem("career-ops:config") || "{}"), logos: false })));
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const query = "tab=EVALUATED&min=3.5&sort=company&dir=1&q=Fixture";
-  const back = () => page.getByRole("link", { name: "Pipeline", exact: true }).filter({ has: page.locator("svg.lucide-arrow-left") });
+  const back = () => page.getByRole("link", { name: "求职进展", exact: true }).filter({ has: page.locator("svg.lucide-arrow-left") });
 
   await page.goto(`${origin.origin}/pipeline?tab=EVALUATED&min=3.5&sort=company&dir=1`);
-  const search = page.getByPlaceholder("Search company or role…");
+  const search = page.getByPlaceholder("搜索公司或岗位…");
   await search.fill("Fixture"); // local typing does not update the URL
   const row = page.locator("tbody tr").filter({ has: page.getByRole("link", { name: "#11", exact: true }) });
   for (const name of ["#11", "Fixture Alpha", "Engineer"]) {
@@ -42,7 +46,7 @@ test("Pipeline detail links preserve the list context", { skip: !url || !root, t
   assert.equal(new URL(page.url()).search.slice(1), query);
   assert.equal(await search.inputValue(), "Fixture");
   assert.equal(await page.locator("tbody tr").count(), 2);
-  assert.equal(await page.getByRole("columnheader", { name: "company" }).getAttribute("aria-sort"), "ascending");
+  assert.equal(await page.getByRole("columnheader", { name: "公司" }).getAttribute("aria-sort"), "ascending");
 
   await page.setViewportSize({ width: 390, height: 844 });
   await search.fill(""); // clearing a URL-seeded query must also survive return

@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CvLoading() {
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8" aria-label="Loading CV editor">
+    <div className="mx-auto max-w-6xl px-6 py-8" aria-label="正在加载简历编辑器">
       <div className="flex items-end justify-between gap-4">
         <div className="space-y-2">
           <Skeleton className="h-8 w-36" />

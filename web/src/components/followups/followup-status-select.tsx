@@ -1,5 +1,7 @@
 "use client";
 
+import { uiLabel } from "@/lib/ui-labels";
+
 import { useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { CANONICAL_STATES } from "@/lib/format";
@@ -42,7 +44,7 @@ export function FollowupStatusSelect({
         body: JSON.stringify({ n: String(n), status: next }),
       });
       const result = (await response.json().catch(() => ({}))) as { error?: string; status?: string };
-      if (!response.ok) throw new Error(result.error || "Status update failed.");
+      if (!response.ok) throw new Error(result.error || "状态更新失败。");
 
       setStatus(result.status || next);
       setSaved(true);
@@ -50,7 +52,7 @@ export function FollowupStatusSelect({
       onSaved();
     } catch (cause) {
       setStatus(previous);
-      setError(cause instanceof Error ? cause.message : "Status update failed.");
+      setError(cause instanceof Error ? cause.message : "状态更新失败。");
     } finally {
       setBusy(false);
     }
@@ -59,8 +61,8 @@ export function FollowupStatusSelect({
   return (
     <span className="inline-flex max-w-full flex-wrap items-center gap-1.5">
       <select
-        aria-label={`Update status for application #${n}`}
-        title="Change status — urgency recalculates from the new status and follow-up history"
+        aria-label={`更新申请 #${n} 的状态`}
+        title="更改状态：紧急程度会根据新状态和跟进历史重新计算"
         value={status}
         onChange={onChange}
         disabled={busy}
@@ -69,16 +71,16 @@ export function FollowupStatusSelect({
           error && "border-red-500/60",
         )}
       >
-        {!CANONICAL_STATES.some((state) => state.toLowerCase() === status.toLowerCase()) && <option value={status}>{status}</option>}
+        {!CANONICAL_STATES.some((state) => state.toLowerCase() === status.toLowerCase()) && <option value={status}>{uiLabel(status)}</option>}
         {CANONICAL_STATES.map((state) => (
           <option key={state} value={state}>
-            {state}
+            {uiLabel(state)}
           </option>
         ))}
       </select>
       <span role="status" aria-live="polite" aria-atomic="true" className="inline-flex min-h-3.5 items-center">
-        {busy && <><Loader2 aria-hidden="true" className="size-3.5 animate-spin text-faint" /><span className="sr-only">Saving status</span></>}
-        {saved && <><Check aria-hidden="true" className="size-3.5 text-brand" /><span className="sr-only">Status saved</span></>}
+        {busy && <><Loader2 aria-hidden="true" className="size-3.5 animate-spin text-faint" /><span className="sr-only">正在保存状态</span></>}
+        {saved && <><Check aria-hidden="true" className="size-3.5 text-brand" /><span className="sr-only">状态已保存</span></>}
       </span>
       {error && <span role="alert" className="basis-full text-xs text-red-400">{error}</span>}
     </span>

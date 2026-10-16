@@ -1,5 +1,7 @@
 "use client";
 
+import { uiLabel } from "@/lib/ui-labels";
+
 import { startTransition, useCallback, useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -172,9 +174,9 @@ export function PipelineView({
     setBulkBusy(false);
     setSelected(new Set(selectedRows.filter((r) => failed.some((f) => f.n === r.n)).map(applicationKey)));
     if (failed.length > 0) {
-      setBulkError(`${failed.length} not saved: ${failed.map((f) => `#${f.n} (${f.error})`).join(", ")}`);
+      setBulkError(`${failed.length} 项未保存： ${failed.map((f) => `#${f.n} (${f.error})`).join(", ")}`);
     }
-    setAnnouncement(`${saved.length} application${saved.length === 1 ? "" : "s"} set to ${bulkStatus}.`);
+    setAnnouncement(`${saved.length} 项申请已设为${uiLabel(bulkStatus)}。`);
     startTransition(() => router.refresh());
   }
 
@@ -182,11 +184,10 @@ export function PipelineView({
     <PageFrame>
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl tracking-tight text-landing">Pipeline</h1>
+          <h1 className="font-display text-2xl tracking-tight text-landing">{"求职进展"}</h1>
           <p className="mt-1 text-sm text-muted">
-            <span className="tabular-nums">{pendingInbox.length}</span> in inbox ·{" "}
-            <span className="tabular-nums">{visibleApplications.length}</span> tracked
-          </p>
+            <span className="tabular-nums">{pendingInbox.length}</span>{"个待评估职位 ·"}{" "}
+            <span className="tabular-nums">{visibleApplications.length}</span>{"个已记录"}</p>
         </div>
         {/* the tracker has its own search; the inbox brings its own facet filters */}
         {visibleTab !== "INBOX" && (
@@ -195,7 +196,7 @@ export function PipelineView({
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search company or role…"
+              placeholder="搜索公司或岗位…"
               className="w-full rounded-md border border-border bg-surface/60 py-2 pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-faint focus:border-brand/50 focus-visible:ring-2 focus-visible:ring-brand/40"
             />
           </div>
@@ -225,7 +226,7 @@ export function PipelineView({
                   : "border-transparent text-muted hover:text-foreground",
               )}
             >
-              {t} <span className="text-faint tabular-nums">{count}</span>
+              {uiLabel(t)} <span className="text-faint tabular-nums">{count}</span>
             </button>
           );
         })}
@@ -235,14 +236,13 @@ export function PipelineView({
 
       {visibleTab !== "INBOX" && minFilter != null && (
         <div className="mt-3 flex items-center gap-2">
-          <span className="text-xs text-faint">Filtered:</span>
+          <span className="text-xs text-faint">{"筛选："}</span>
           <button
             type="button"
             onClick={() => setParams({ min: null })}
             className="inline-flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand-soft px-2.5 py-1 text-xs font-medium text-brand transition-colors hover:bg-brand/15"
-            title="Clear score filter"
-          >
-            score ≥ {minFilter.toFixed(1)}
+            title="清除评分筛选"
+          >{"评分 ≥"}{minFilter.toFixed(1)}
             <X className="size-3" />
           </button>
         </div>
@@ -250,17 +250,17 @@ export function PipelineView({
 
       {visibleTab !== "INBOX" && selectedRows.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface/60 px-3 py-2 text-sm">
-          <span className="tabular-nums">{selectedRows.length} selected</span>
+          <span className="tabular-nums">{selectedRows.length} 项已选</span>
           <select
-            aria-label="Status for selected applications"
+            aria-label="所选申请的状态"
             value={bulkStatus}
             onChange={(e) => setBulkStatus(e.target.value)}
             disabled={bulkBusy}
             className="rounded-md border border-border bg-surface px-2 py-1 text-sm"
           >
-            <option value="">Set status…</option>
+            <option value="">设置状态…</option>
             {CANONICAL_STATES.map((s) => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s}>{uiLabel(s)}</option>
             ))}
           </select>
           <button
@@ -269,18 +269,18 @@ export function PipelineView({
             disabled={!bulkStatus || bulkBusy}
             className="rounded-md border border-brand/40 bg-brand-soft px-2.5 py-1 text-xs font-medium text-brand disabled:opacity-50"
           >
-            {bulkBusy ? "Saving…" : "Apply"}
+            {bulkBusy ? "保存中…" : "应用"}
           </button>
           {selectedRows.length >= 2 && selectedRows.length <= COMPARE_MAX && (
             <Link
               href={`/pipeline/compare?n=${selectedRows.map((r) => r.n).join(",")}`}
               className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground hover:border-brand/40 hover:text-brand"
             >
-              Compare
+              对比
             </Link>
           )}
           <button type="button" onClick={() => setSelected(new Set())} className="text-xs text-muted hover:text-foreground">
-            Clear
+            清除
           </button>
           {bulkError && <span role="alert" className="text-xs text-red-500">{bulkError}</span>}
         </div>
@@ -305,7 +305,7 @@ export function PipelineView({
                 <th className="w-8 px-3 py-2.5">
                   <input
                     type="checkbox"
-                    aria-label="Select all shown applications"
+                    aria-label="选择所有显示的申请"
                     checked={allSelected}
                     onChange={() => setSelected(allSelected ? new Set() : new Set(filteredKeys))}
                   />
@@ -324,7 +324,7 @@ export function PipelineView({
                       className="inline-flex cursor-pointer select-none items-center gap-1 uppercase tracking-wide hover:text-foreground"
                       onClick={() => setParams({ sort: k, dir: sort.key === k ? sort.dir * -1 : -1 })}
                     >
-                      {k}
+                      {uiLabel(k)}
                       <ChevronsUpDown aria-hidden="true" className="size-3" />
                     </button>
                   </th>
@@ -344,7 +344,7 @@ export function PipelineView({
                     <td className="w-8 px-3 py-3">
                       <input
                         type="checkbox"
-                        aria-label={`Select ${company.label}, ${r.role} (#${r.n})`}
+                        aria-label={`选择 ${company.label}，${r.role}（#${r.n}）`}
                         checked={selected.has(key)}
                         onChange={() => toggleRow(key)}
                       />
@@ -393,7 +393,7 @@ export function PipelineView({
                         if (tab !== "ALL" && !canonStatus(status).includes(tab) && (restoreFocus || focusedRow?.dataset.applicationKey === key)) {
                           activeTab.current?.focus();
                         }
-                        setAnnouncement(`Application #${r.n} status saved as ${status}.`);
+                        setAnnouncement(`申请 #${r.n} 状态已保存为${uiLabel(status)}。`);
                         startTransition(() => {
                           showSavedStatus({ key, status });
                           router.refresh();
@@ -415,8 +415,8 @@ export function PipelineView({
         </div>
       ) : (
         <div className="mt-4 rounded-2xl border border-dashed border-border bg-surface/30 px-6 py-12 text-center">
-          <p className="font-display text-lg">No matches</p>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-muted">Try a different tab or clear the search.</p>
+          <p className="font-display text-lg">没有匹配结果</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted">尝试其他标签，或清除搜索。</p>
         </div>
       )}
     </PageFrame>
@@ -432,30 +432,28 @@ function InboxEmpty({ tracked }: { tracked: number }) {
         <span className="size-2.5 rounded-full bg-foreground/15" aria-hidden="true" />
         <span className="size-2.5 rounded-full bg-foreground/15" aria-hidden="true" />
         <span className="size-2.5 rounded-full bg-foreground/15" aria-hidden="true" />
-        <span className="ml-3 font-mono text-xs tracking-wide text-muted">career-ops · inbox</span>
+        <span className="ml-3 font-mono text-xs tracking-wide text-muted">{"career-ops · 待评估"}</span>
       </div>
       <div className="px-6 py-10 text-center">
-        <p className="font-display text-lg">
-          Your <span className="text-brand">inbox</span> is empty.
-        </p>
+        <p className="font-display text-lg">{"你的"}<span className="text-brand">{"待评估列表"}</span>{"为空。"}</p>
         {tracked > 0 && (
           <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
-            New postings land here. Your{" "}
+            新职位会显示在这里。你的{" "}
             <Link href="/pipeline?tab=ALL" className="font-medium text-brand-text underline-offset-2 hover:underline">
-              {tracked} tracked role{tracked === 1 ? "" : "s"}
+              {tracked} 个已记录职位
             </Link>{" "}
-            {tracked === 1 ? "is" : "are"} under All.
+            可在“全部”中查看。
           </p>
         )}
-        <p className="mx-auto mt-2 max-w-sm text-sm text-muted">Find roles that match your CV — free, no tokens spent.</p>
+        <p className="mx-auto mt-2 max-w-sm text-sm text-muted">免费查找与你简历匹配的职位，不消耗 Token。</p>
         <Link
           href="/explore?run=1"
           className="mt-5 inline-flex items-center gap-2 rounded-full bg-brand px-5 py-2.5 text-sm font-medium text-brand-foreground shadow-sm transition-all duration-200 hover:bg-brand-200 hover:-translate-y-0.5 hover:shadow-md"
         >
-          <Compass className="size-4" /> {tracked > 0 ? "Run a free scan" : "Run your first free scan"} <ArrowRight className="size-4" />
+          <Compass className="size-4" /> {tracked > 0 ? "运行免费扫描" : "开始首次免费扫描"} <ArrowRight className="size-4" />
         </Link>
         <p className="mx-auto mt-4 max-w-sm text-xs text-muted">
-          Prefer the terminal? Run <code className="rounded bg-surface-hover px-1 py-0.5 font-mono">career-ops scan</code>, or add job URLs to{" "}
+          喜欢使用终端？运行 <code className="rounded bg-surface-hover px-1 py-0.5 font-mono">career-ops scan</code>，或将职位链接添加到{" "}
           <code className="rounded bg-surface-hover px-1 py-0.5 font-mono">data/pipeline.md</code>.
         </p>
       </div>

@@ -18,16 +18,20 @@ test("Inbox Undo remains retryable after failure", { skip: !url || !root, timeou
   assert.equal(fs.readFileSync(path.join(root, ".inbox-undo-fixture"), "utf8").trim(), "fictional-only");
   const pipeline = path.join(root, "data/pipeline.md");
   const { chromium } = await import("playwright-core");
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const browser = await chromium.launch({ channel: process.env.CAREER_OPS_TEST_BROWSER_CHANNEL || "chrome", headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await page.context().route("**/api/logo?**", (route) => route.fulfill({ status: 204 }));
+  await page.context().route("**/api/usage", (route) => route.fulfill({ json: {} }));
+  await page.context().route("**/api/version", (route) => route.fulfill({ json: { version: "fixture" } }));
+  await page.addInitScript(() => localStorage.setItem("career-ops:config", JSON.stringify({ ...JSON.parse(localStorage.getItem("career-ops:config") || "{}"), logos: false })));
   let release = () => {};
   t.after(async () => { release(); await page.unrouteAll({ behavior: "wait" }); await browser.close(); });
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   const row = (company) => page.locator("li").filter({ hasText: company });
-  const undo = () => page.getByRole("button", { name: "Undo", exact: true });
-  const retry = () => page.getByRole("button", { name: "Retry undo", exact: true });
-  const writeAlerts = () => page.getByRole("alert").filter({ hasText: /Could not skip|Some jobs could not be restored|Fixture .* busy/ });
+  const undo = () => page.getByRole("button", { name: "撤销", exact: true });
+  const retry = () => page.getByRole("button", { name: "重试撤销", exact: true });
+  const writeAlerts = () => page.getByRole("alert").filter({ hasText: /无法跳过|部分职位无法恢复|Fixture .* busy/ });
   async function until(check) {
     const start = Date.now();
     while (!await check()) {
@@ -51,10 +55,10 @@ test("Inbox Undo remains retryable after failure", { skip: !url || !root, timeou
     await gate;
     await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Fixture pipeline busy" }) });
   });
-  await row("Fixture Alpha").getByTitle("Skip — hide from the inbox").click({ noWaitAfter: true });
+  await row("Fixture Alpha").getByTitle("跳过，从待评估列表隐藏").click({ noWaitAfter: true });
   await undo().focus();
   await page.keyboard.press("Enter");
-  const pending = page.getByRole("button", { name: "Undoing…", exact: true });
+  const pending = page.getByRole("button", { name: "撤销中…", exact: true });
   await pending.waitFor();
   assert.equal(await pending.isDisabled(), true);
   await page.waitForTimeout(5200); // the original toast timeout must not hide a pending restore
@@ -68,21 +72,21 @@ test("Inbox Undo remains retryable after failure", { skip: !url || !root, timeou
   assert.equal(await retry().isVisible(), true);
   await page.unroute("**/api/inbox/skip");
   await retry().click();
-  await row("Fixture Alpha").getByTitle("Skip — hide from the inbox").waitFor();
+  await row("Fixture Alpha").getByTitle("跳过，从待评估列表隐藏").waitFor();
   assert.ok(fs.readFileSync(pipeline, "utf8").includes("[ ] https://example.com/fixture-alpha"));
   assert.equal(await retry().count(), 0);
 
   // The last Skip refreshes the inbox to zero rows. Its Undo must stay mounted.
-  await row("Fixture Alpha").getByTitle("Skip — hide from the inbox").click();
+  await row("Fixture Alpha").getByTitle("跳过，从待评估列表隐藏").click();
   await until(() => fs.readFileSync(pipeline, "utf8").includes("[x] https://example.com/fixture-alpha"));
   await page.setViewportSize({ width: 390, height: 844 });
-  await row("Fixture Beta").getByTitle("Skip — hide from the inbox").click();
+  await row("Fixture Beta").getByTitle("跳过，从待评估列表隐藏").click();
   await until(() => fs.readFileSync(pipeline, "utf8").includes("[x] https://example.com/fixture-beta"));
-  await page.getByText("Your inbox is empty.", { exact: true }).waitFor();
+  await page.getByText("你的待评估列表为空。", { exact: true }).waitFor();
   assert.equal(await undo().isVisible(), true);
   assert.equal(await undo().evaluate((el) => el.getBoundingClientRect().height >= 44), true);
   await undo().click();
-  await row("Fixture Beta").getByTitle("Skip — hide from the inbox").waitFor();
+  await row("Fixture Beta").getByTitle("跳过，从待评估列表隐藏").waitFor();
 
   async function resetInbox() {
     for (const company of ["alpha", "beta"]) {
@@ -91,7 +95,7 @@ test("Inbox Undo remains retryable after failure", { skip: !url || !root, timeou
     }
     await page.evaluate(() => localStorage.removeItem("career-ops:hidden"));
     await page.reload();
-    await row("Fixture Alpha").getByTitle("Skip — hide from the inbox").waitFor();
+    await row("Fixture Alpha").getByTitle("跳过，从待评估列表隐藏").waitFor();
   }
 
   await t.test("Undo waits for a failed Skip and restores the row without a stale error", async () => {
@@ -113,14 +117,14 @@ test("Inbox Undo remains retryable after failure", { skip: !url || !root, timeou
       await route.continue();
     });
     try {
-      await row("Fixture Alpha").getByTitle("Skip — hide from the inbox").click();
+      await row("Fixture Alpha").getByTitle("跳过，从待评估列表隐藏").click();
       await undo().click();
       releaseSkip();
       await until(() => undoRequests === 1);
       // Failure-handler completion is asserted deterministically in the unit
       // suite. This browser check covers request order and the restored UI.
       releaseUndo();
-      await row("Fixture Alpha").getByTitle("Skip — hide from the inbox").waitFor();
+      await row("Fixture Alpha").getByTitle("跳过，从待评估列表隐藏").waitFor();
       assert.equal(await writeAlerts().count(), 0);
       assert.equal(await undo().count(), 0);
       assert.equal(undoRequests, 1);
@@ -137,7 +141,7 @@ test("Inbox Undo remains retryable after failure", { skip: !url || !root, timeou
       "https://example.com/fixture-alpha", "https://example.com/fixture-beta",
     ])));
     await page.reload();
-    const restore = page.getByRole("button", { name: "2 hidden · restore", exact: true });
+    const restore = page.getByRole("button", { name: "2 个已隐藏 · 恢复", exact: true });
     await restore.waitFor();
     const restoreGate = new Promise((resolve) => { release = resolve; });
     let requests = 0;
@@ -151,22 +155,22 @@ test("Inbox Undo remains retryable after failure", { skip: !url || !root, timeou
     });
     try {
       await restore.evaluate((button) => { button.click(); button.click(); button.click(); });
-      const restoring = page.getByRole("button", { name: /hidden · restoring/ });
+      const restoring = page.getByRole("button", { name: /个已隐藏 · 恢复中/ });
       await restoring.waitFor();
       assert.equal(await restoring.isDisabled(), true);
       assert.equal(await restoring.getAttribute("aria-busy"), "true");
       await until(() => requests === 2);
       release();
-      const remaining = page.getByRole("button", { name: "1 hidden · restore", exact: true });
+      const remaining = page.getByRole("button", { name: "1 个已隐藏 · 恢复", exact: true });
       await remaining.waitFor();
       assert.equal(await remaining.isEnabled(), true);
       assert.equal(requests, 2);
-      await page.getByRole("alert").filter({ hasText: "Some jobs could not be restored" }).waitFor();
-      await row("Fixture Alpha").getByTitle("Skip — hide from the inbox").waitFor();
+      await page.getByRole("alert").filter({ hasText: "部分职位无法恢复" }).waitFor();
+      await row("Fixture Alpha").getByTitle("跳过，从待评估列表隐藏").waitFor();
       assert.equal(await row("Fixture Beta").count(), 0);
       await page.unrouteAll({ behavior: "wait" });
       await remaining.click();
-      await row("Fixture Beta").getByTitle("Skip — hide from the inbox").waitFor();
+      await row("Fixture Beta").getByTitle("跳过，从待评估列表隐藏").waitFor();
       assert.equal(await writeAlerts().count(), 0);
     } finally {
       release();

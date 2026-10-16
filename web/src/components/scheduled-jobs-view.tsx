@@ -33,7 +33,7 @@ type SchedulerStatus = {
 };
 
 function formatTaskTime(value: string | null) {
-  if (!value) return "Not reported";
+  if (!value) return "未提供";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
@@ -60,7 +60,7 @@ export function ScheduledJobsView() {
       ]);
       const resJobs = await jobsResponse.json().catch(() => ({}));
       const resScheduler = await schedulerResponse.json().catch(() => null);
-      if (!jobsResponse.ok) throw new Error(resJobs.error || "Could not load scheduled scans.");
+      if (!jobsResponse.ok) throw new Error(resJobs.error || "无法加载定时扫描。");
       if (!schedulerResponse.ok && resScheduler?.error) setError(resScheduler.error);
       setStore({
         jobs: Array.isArray(resJobs.jobs) ? resJobs.jobs : [],
@@ -68,7 +68,7 @@ export function ScheduledJobsView() {
       });
       if (schedulerResponse.ok && isSchedulerStatusPayload(resScheduler)) setScheduler(resScheduler as SchedulerStatus);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load scheduled scans.");
+      setError(cause instanceof Error ? cause.message : "无法加载定时扫描。");
     } finally {
       setLoading(false);
     }
@@ -84,22 +84,22 @@ export function ScheduledJobsView() {
       await updateScheduledJobRequest(id, { status: nextStatus });
       await loadData();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not update scheduled scan.");
+      setError(cause instanceof Error ? cause.message : "无法更新定时扫描。");
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this scheduled scan?")) return;
+    if (!confirm("确定删除此定时扫描？")) return;
     try {
       const response = await fetch(`/api/scheduled-jobs/${id}`, { method: "DELETE" });
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        setError(body.error || "Could not delete scheduled scan.");
+        setError(body.error || "无法删除定时扫描。");
         return;
       }
       await loadData();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not delete scheduled scan.");
+      setError(cause instanceof Error ? cause.message : "无法删除定时扫描。");
     }
   };
 
@@ -108,10 +108,10 @@ export function ScheduledJobsView() {
     try {
       const response = await fetch("/api/scheduler", { method: "POST" });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || "Could not start scheduler.");
+      if (!response.ok) throw new Error(body.error || "无法启动调度器。");
       await loadData();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not start scheduler.");
+      setError(cause instanceof Error ? cause.message : "无法启动调度器。");
     } finally {
       setOsRunning(false);
     }
@@ -149,11 +149,9 @@ export function ScheduledJobsView() {
         <div>
           <div className="flex items-center gap-2.5">
             <CalendarClock className="size-6 text-brand" />
-            <h1 className={`${instrumentSerif.className} text-3xl text-foreground`}>Scheduled Scans</h1>
+            <h1 className={`${instrumentSerif.className} text-3xl text-foreground`}>{"定时扫描"}</h1>
           </div>
-          <p className="mt-1.5 max-w-2xl text-sm text-muted">
-            Persistent, automated crawler jobs supporting Zero-Token and Full ATS Dataset sweeps.
-          </p>
+          <p className="mt-1.5 max-w-2xl text-sm text-muted">{"保存自动扫描任务，支持招聘门户扫描与完整 ATS 数据集扫描。"}</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
@@ -162,23 +160,20 @@ export function ScheduledJobsView() {
             onClick={() => setCreateModalOpen(true)}
             className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-medium text-brand-foreground shadow-lg transition-all hover:bg-brand-200"
           >
-            <CalendarPlus className="size-4" />
-            New Scheduled Scan
-          </button>
+            <CalendarPlus className="size-4" />{"新建定时扫描"}</button>
           <button
             type="button"
             onClick={() => setHistoryDrawerOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/60 px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-hover"
           >
-            <History className="size-4 text-brand" />
-            Run Logs ({store.runs.length})
+            <History className="size-4 text-brand" />{"运行日志（"}{store.runs.length}）
           </button>
           <button
             type="button"
             onClick={loadData}
             disabled={loading}
             className="inline-flex size-9 items-center justify-center rounded-full border border-border bg-surface/60 text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
-            title="Refresh list"
+            title="刷新列表"
           >
             <RefreshCw className={`size-4 ${loading ? "animate-spin text-brand" : ""}`} />
           </button>
@@ -188,10 +183,10 @@ export function ScheduledJobsView() {
 
       {/* Stats Cards */}
       <div className="grid gap-3.5 sm:grid-cols-4">
-        <StatCard label="Active Scans" value={activeJobs.length} subtitle={`${jobsList.length} total jobs`} icon={<Zap className="size-4 text-emerald-500" />} />
-        <StatCard label="Executed Runs" value={totalRuns} subtitle={`${successRuns} successful`} icon={<Layers className="size-4 text-brand" />} />
-        <StatCard label="Roles Discovered" value={totalRolesFound} subtitle="Pushed to pipeline" icon={<Sparkles className="size-4 text-amber-500" />} />
-        <StatCard label="Success Rate" value={successRate} subtitle={`${failedRuns} failed runs`} icon={<CheckCircle2 className="size-4 text-emerald-500" />} />
+        <StatCard label="启用中的扫描" value={activeJobs.length} subtitle={`${jobsList.length} 个任务`} icon={<Zap className="size-4 text-emerald-500" />} />
+        <StatCard label="已执行次数" value={totalRuns} subtitle={`${successRuns} 次成功`} icon={<Layers className="size-4 text-brand" />} />
+        <StatCard label="已发现职位" value={totalRolesFound} subtitle="已加入求职进展" icon={<Sparkles className="size-4 text-amber-500" />} />
+        <StatCard label="成功率" value={successRate} subtitle={`${failedRuns} 次失败`} icon={<CheckCircle2 className="size-4 text-emerald-500" />} />
       </div>
 
       {/* OS Task Scheduler Banner */}
@@ -204,7 +199,7 @@ export function ScheduledJobsView() {
               </div>
               <div>
                 <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  {scheduler.platform === "win32" ? "Windows Task Scheduler Integration" : "Manual scans"}
+                  {scheduler.platform === "win32" ? "Windows 任务计划程序集成" : "手动扫描"}
                   <span
                     className={
                       scheduler.task.exists && scheduler.task.enabled
@@ -213,18 +208,18 @@ export function ScheduledJobsView() {
                     }
                   >
                     {scheduler.platform !== "win32"
-                      ? "No automatic schedule"
+                      ? "无自动调度"
                       : scheduler.task.exists
-                        ? scheduler.task.enabled ? "Task enabled" : "Task disabled"
-                        : "Task not installed"}
+                        ? scheduler.task.enabled ? "任务已启用" : "任务已禁用"
+                        : "尚未安装任务"}
                   </span>
                 </div>
                 <div className="mt-0.5 text-xs text-muted">
                   {scheduler.platform !== "win32"
-                    ? "On macOS and Linux, saved scans only run when you choose Run now."
+                    ? "在 macOS 和 Linux 上，已保存的扫描仅在点击“立即运行”时执行。"
                     : scheduler.task.exists
-                      ? "Next OS check: " + formatTaskTime(scheduler.task.nextRun) + " · Last OS check: " + formatTaskTime(scheduler.task.lastRun)
-                      : "Install the Windows task with web/scripts/install-scan-schedule.ps1 to run due jobs automatically."}
+                      ? "下次系统检查：" + formatTaskTime(scheduler.task.nextRun) + " · 上次系统检查：" + formatTaskTime(scheduler.task.lastRun)
+                      : "安装 web/scripts/install-scan-schedule.ps1 中的 Windows 任务，即可自动运行到期扫描。"}
                 </div>
               </div>
             </div>
@@ -235,7 +230,7 @@ export function ScheduledJobsView() {
               className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-hover disabled:opacity-50"
             >
               {osRunning ? <Loader2 className="size-3.5 animate-spin text-brand" /> : <Zap className="size-3.5 text-brand" />}
-              {osRunning ? "Checking..." : "Check due jobs now"}
+              {osRunning ? "检查中…" : "立即检查到期任务"}
             </button>}
           </div>
         </div>
@@ -250,8 +245,7 @@ export function ScheduledJobsView() {
             className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
               filterTab === "all" ? "bg-brand text-brand-foreground shadow" : "text-muted hover:text-foreground"
             }`}
-          >
-            All Scans ({jobsList.length})
+          >{"全部扫描（"}{jobsList.length}）
           </button>
           <button
             type="button"
@@ -259,8 +253,7 @@ export function ScheduledJobsView() {
             className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
               filterTab === "active" ? "bg-brand text-brand-foreground shadow" : "text-muted hover:text-foreground"
             }`}
-          >
-            Active ({activeJobs.length})
+          >{"启用中（"}{activeJobs.length}）
           </button>
           <button
             type="button"
@@ -268,8 +261,7 @@ export function ScheduledJobsView() {
             className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
               filterTab === "paused" ? "bg-brand text-brand-foreground shadow" : "text-muted hover:text-foreground"
             }`}
-          >
-            Paused ({pausedJobs.length})
+          >{"已暂停（"}{pausedJobs.length}）
           </button>
         </div>
 
@@ -279,7 +271,7 @@ export function ScheduledJobsView() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search scans or keywords…"
+            placeholder="搜索扫描或关键词…"
             className="w-full rounded-full border border-border bg-surface/60 pl-8 pr-3 py-1.5 text-xs text-foreground outline-none focus:border-brand/60"
           />
         </div>
@@ -289,15 +281,14 @@ export function ScheduledJobsView() {
       {filteredJobs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-12 text-center">
           <CalendarClock className="mx-auto size-8 text-faint" />
-          <h3 className="mt-3 text-sm font-semibold text-foreground">No scheduled scans found</h3>
-          <p className="mt-1 text-xs text-muted">Create a new scan to start automatically discovering matching jobs.</p>
+          <h3 className="mt-3 text-sm font-semibold text-foreground">{"没有定时扫描"}</h3>
+          <p className="mt-1 text-xs text-muted">{"新建扫描任务，开始发现匹配职位。"}</p>
           <button
             type="button"
             onClick={() => setCreateModalOpen(true)}
             className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-xs font-medium text-brand-foreground shadow"
           >
-            <CalendarPlus className="size-3.5" /> New Scheduled Scan
-          </button>
+            <CalendarPlus className="size-3.5" />{"新建定时扫描"}</button>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

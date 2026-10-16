@@ -44,9 +44,7 @@ export function QuietCompanies() {
     return (
       <section className="mt-8 rounded-2xl border border-dashed border-border bg-surface/30 px-5 py-4">
         <Header courtesyDays={null} />
-        <p className="mt-2 text-sm text-muted">
-          This check didn&apos;t run, so nothing here says whether anyone has gone quiet.
-        </p>
+        <p className="mt-2 text-sm text-muted">{"此检查未运行，暂时无法判断是否有公司长时间未回复。"}</p>
       </section>
     );
   }
@@ -55,8 +53,7 @@ export function QuietCompanies() {
     return (
       <section className="mt-8 rounded-2xl border border-border bg-surface/30 px-5 py-4">
         <Header courtesyDays={model.courtesyDays} />
-        <p className="mt-2 text-sm text-muted">
-          Nothing has gone quiet past the threshold{model.checked > 0 ? ` across ${model.checked} compan${model.checked === 1 ? "y" : "ies"}` : ""}.
+        <p className="mt-2 text-sm text-muted">{"没有超过期限仍无回复的公司"}{model.checked > 0 ? `，涉及 ${model.checked} 家公司` : ""}.
         </p>
         {/* The caveats belong here MORE than on the populated panel, not less: an
             "all clear" drawn from a partial check is the reading most likely to
@@ -107,8 +104,8 @@ function Header({ courtesyDays }: { courtesyDays: number | null }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Clock3 className="size-4 text-brand" />
-      <h2 className="font-display text-base text-landing">No reply since your last round</h2>
-      {courtesyDays !== null && <span className="text-xs text-faint">past {courtesyDays} days</span>}
+      <h2 className="font-display text-base text-landing">{"上次联系后尚无回复"}</h2>
+      {courtesyDays !== null && <span className="text-xs text-faint">{"已超过"}{courtesyDays}{"天"}</span>}
     </div>
   );
 }
@@ -141,7 +138,7 @@ function Row({ c }: { c: QuietCompany }) {
           {c.role && <span className="text-muted"> · {c.role}</span>}
         </p>
         <p className="text-xs text-faint">
-          {c.days} day{c.days === 1 ? "" : "s"} since {c.lastDate ?? "the last round"}
+          {c.days}{"天"}{"自"}{c.lastDate ?? "上次联系"}
           {c.trackerNums.length > 0 && <span> · #{c.trackerNums.join(", #")}</span>}
         </p>
       </div>
@@ -156,12 +153,12 @@ function Row({ c }: { c: QuietCompany }) {
           className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-brand/40 hover:text-foreground"
         >
           {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-          {copied ? "Copied" : "Copy blacklist row"}
+          {copied ? "已复制" : "复制黑名单记录"}
         </button>
       )}
       {fallback && (
         <div className="w-full">
-          <p className="text-xs text-muted">Couldn&apos;t reach the clipboard — select and copy:</p>
+          <p className="text-xs text-muted">{"无法访问剪贴板，请选择并复制："}</p>
           <code className="mt-1 block w-full select-all overflow-x-auto rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[11px] text-foreground">
             {fallback}
           </code>
