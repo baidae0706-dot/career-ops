@@ -276,9 +276,13 @@ def record_review(state, args):
 
 
 def merge_candidate(state, args):
-    from finish_delivery import finish
+    from finish_delivery import finish, require_target_contains_merge
     if str(args.issue) in state["completed"]:
-        return state["completed"][str(args.issue)]
+        receipt = state["completed"][str(args.issue)]
+        target_sha = require_target_contains_merge(read(args.config), receipt, receipt.get("merge_sha"))
+        receipt = {**receipt, "target_head_sha": target_sha}
+        state["completed"][str(args.issue)] = receipt
+        return receipt
     active = active_issue(state)
     if active["issue"] != args.issue or active["stage"] != "merge":
         raise ValueError("Both Codex and Opus must accept this exact candidate before merge")

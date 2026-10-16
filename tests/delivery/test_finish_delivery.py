@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -812,6 +813,51 @@ class FinishDeliveryTests(unittest.TestCase):
         resumed = self.finish()
         self.assertEqual(resumed["merge_sha"], result["merge_sha"])
         self.assertEqual(resumed["target_head_sha"], self.live_base)
+        self.assertEqual(self.mutations, original_writes)
+
+    def test_coordinator_completed_merge_rechecks_current_target(self):
+        import coordinator
+
+        self.make_upstream_candidate()
+        closed = self.finish()
+        self.assertEqual(closed["target_branch"], self.target_branch)
+        state_path, config_path = self.root / "coordinator.json", self.root / "project.json"
+        state = dict(repo=self.config["repo"], revision=1, active=None, events=[],
+                     completed={str(self.request["issue"]): closed})
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        config_path.write_text(json.dumps(self.config), encoding="utf-8")
+        argv = ["coordinator.py", "--config", str(config_path), "--state", str(state_path),
+                "merge", "--issue", str(self.request["issue"])]
+        original_writes = copy.deepcopy(self.mutations)
+        original_state = state_path.read_bytes()
+
+        def resume():
+            result = io.StringIO()
+            with patch.object(sys, "argv", argv), patch("subprocess.check_output", side_effect=self.external_output), \
+                    patch("subprocess.Popen", side_effect=self.external_popen), contextlib.redirect_stdout(result):
+                coordinator.main()
+            return json.loads(result.getvalue())
+
+        self.live_base = self.base
+        with self.assertRaisesRegex(RuntimeError, "Current target"):
+            resume()
+        self.assertEqual(state_path.read_bytes(), original_state)
+        self.assertEqual(self.mutations, original_writes)
+        self.live_base = self.git("-c", "user.name=Delivery Test", "-c", "user.email=test@example.invalid",
+                                  "commit-tree", self.tree, "-p", self.merge_sha, "-m", "later feature")
+        resumed = resume()
+        self.assertTrue(resumed["closed"])
+        self.assertEqual(resumed["merge_sha"], closed["merge_sha"])
+        self.assertEqual(resumed["target_head_sha"], self.live_base)
+        self.assertEqual(self.mutations, original_writes)
+        stored = json.loads(state_path.read_text(encoding="utf-8"))
+        self.assertEqual(stored["completed"][str(self.request["issue"])], resumed)
+        stored["completed"][str(self.request["issue"])].pop("target_branch")
+        state_path.write_text(json.dumps(stored), encoding="utf-8")
+        historical_state = state_path.read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "target branch"):
+            resume()
+        self.assertEqual(state_path.read_bytes(), historical_state)
         self.assertEqual(self.mutations, original_writes)
 
     def test_compare_requires_exact_base_common_ancestor_and_direction(self):

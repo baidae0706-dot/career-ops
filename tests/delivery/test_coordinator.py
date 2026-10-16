@@ -332,7 +332,10 @@ class CoordinatorTests(unittest.TestCase):
                 patch("finish_delivery.finish", side_effect=recovered_finish), contextlib.redirect_stdout(io.StringIO()):
             coordinator.main()
         self.assertEqual(self.run_cli("next")["issue"], 2)
-        self.assertEqual(self.run_cli("merge", "--issue", 1), closure)
+        # This historical fixture has no target branch; cached completion alone
+        # cannot authorize another successful merge readback.
+        rejected = self.run_cli("merge", "--issue", 1, success=False)
+        self.assertIn("target branch", rejected.stderr)
 
     def test_fable_is_separate_and_cannot_replace_opus_consensus(self):
         checkout, path, request = self.candidate()

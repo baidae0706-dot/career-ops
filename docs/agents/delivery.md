@@ -166,7 +166,10 @@ A merge reruns `merge --issue N`, which reads actual PR/merge/comment/closure
 state. Target containment compares the merge SHA against a newly observed full
 target SHA, verifying the compare response's base and common ancestor rather
 than a paginated commits list. Even a previously merged PR and closed Issue
-require this proof before queue advancement. GitHub REST's `sha` condition pins
+require this proof before queue advancement. The completed-Issue `merge` entry
+rechecks the same containment proof using the target branch stored in its closure
+receipt. An older receipt without that branch is insufficient; retain the original
+request and live proof before explicitly repairing its history. GitHub REST's `sha` condition pins
 the PR head, not the target base atomically; a race is caught by post-merge
 parents/tree verification, and it does not authorize closing the Issue. The finish
 journal lives beside the immutable review receipt. A provably

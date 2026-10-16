@@ -213,7 +213,12 @@ def read_pr(config, request):
 
 def require_target_contains_merge(config, request, merge_sha):
     """Bind containment to an observed target SHA, not a paginated commit list."""
-    target = github_json(config, "api", f"repos/{config['repo']}/git/ref/heads/{request['target_branch']}")
+    branch = request.get("target_branch")
+    if not isinstance(branch, str) or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._/-]*", branch):
+        raise RuntimeError("Verified target branch is missing or invalid; retain original completion evidence")
+    if not isinstance(merge_sha, str) or not re.fullmatch(r"[a-f0-9]{40}", merge_sha):
+        raise RuntimeError("Verified merge SHA is missing or invalid")
+    target = github_json(config, "api", f"repos/{config['repo']}/git/ref/heads/{branch}")
     target_sha = target["object"]["sha"]
     if not isinstance(target_sha, str) or not re.fullmatch(r"[a-f0-9]{40}", target_sha):
         raise RuntimeError("Live target SHA is invalid")
@@ -345,7 +350,7 @@ def finish_locked(config, folder, checkout, codex_path, destination, reconcile_o
         raise RuntimeError("Issue closure not confirmed; preserve the pending operation")
     receipt = dict(closed=True, repo=config["repo"], issue=request["issue"], pr=request["pr"],
         head=request["head_sha"], merge_sha=merge_sha, tree=tree, parent=request["target_base_sha"],
-        merge_method=method, parents=parents, target_head_sha=target_sha,
+        merge_method=method, parents=parents, target_branch=request["target_branch"], target_head_sha=target_sha,
         **({"upstream_sha": request["upstream_sha"]} if method == "merge" else {}),
         comment_sha256=proposed["body_sha256"], **identity)
     write(destination / "closure.json", receipt)
