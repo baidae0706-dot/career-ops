@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cardReason, readMachineSummary, scoreLevers } from "../../src/lib/machine-summary.mjs";
+import { cardReason, prepQuestions, readMachineSummary, scoreLevers } from "../../src/lib/machine-summary.mjs";
 
 const report = (yaml) => `# Evaluation: Northwind Labs -- Platform Engineer
 
@@ -140,4 +140,43 @@ test("a soft gap listed twice is one close call", () => {
   assert.deepEqual(scoreLevers(readMachineSummary(summary)).close, [
     { text: "Light on people management", importance: null },
   ]);
+});
+
+test("prep questions follow importance and pick the question from the match", () => {
+  assert.deepEqual(prepQuestions(readMachineSummary(full)), [
+    { requirement: "Kubernetes in production", importance: "critical", match: "missing", question: "The role asks for Kubernetes in production. How would you close that gap?" },
+    { requirement: "Python", importance: "critical", match: "strong", question: "Walk me through your strongest example of Python. What was the outcome?" },
+    { requirement: "On-call leadership", importance: "high", match: "partial", question: "Where have you used On-call leadership, and how deep did you go?" },
+    { requirement: "Terraform", importance: "meaningful", match: "missing", question: "The role asks for Terraform. How would you close that gap?" },
+  ]);
+});
+
+test("prep questions stop at the limit", () => {
+  assert.deepEqual(prepQuestions(readMachineSummary(full), 1).map((q) => q.requirement), ["Kubernetes in production"]);
+});
+
+test("a repeated requirement gets one question, from its most important entry", () => {
+  const s = readMachineSummary(report(`requirement_importance:
+  - requirement: "SQL"
+    importance: "meaningful"
+    match: "partial"
+  - requirement: "SQL"
+    importance: "critical"
+    match: "missing"`));
+  assert.deepEqual(prepQuestions(s).map((q) => [q.requirement, q.importance]), [["SQL", "critical"]]);
+});
+
+test("an inherited key is not a valid importance or match", () => {
+  const s = readMachineSummary(report(`requirement_importance:
+  - requirement: "Rust"
+    importance: "constructor"
+    match: "missing"
+  - requirement: "Go"
+    importance: "high"
+    match: "__proto__"
+  - requirement: "Python"
+    importance: "high"
+    match: "strong"`));
+  assert.deepEqual(s.requirements.map((r) => r.requirement), ["Go", "Python"]);
+  assert.deepEqual(prepQuestions(s).map((q) => q.requirement), ["Python"]);
 });

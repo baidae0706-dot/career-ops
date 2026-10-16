@@ -53,7 +53,7 @@ export function readMachineSummary(report) {
     hardStops: strings(raw.hard_stops),
     softGaps: strings(raw.soft_gaps),
     requirements: (Array.isArray(raw.requirement_importance) ? raw.requirement_importance : [])
-      .filter((r) => r && String(r.requirement ?? "").trim() && String(r.importance) in IMPORTANCE_RANK)
+      .filter((r) => r && String(r.requirement ?? "").trim() && Object.hasOwn(IMPORTANCE_RANK, String(r.importance)))
       .map((r) => ({
         requirement: String(r.requirement).trim(),
         importance: /** @type {Importance} */ (String(r.importance)),
@@ -111,4 +111,31 @@ export function cardReason(report) {
   const { holding, close } = scoreLevers(s);
   const reason = { decision: s.decision, plus: s.strengths[0] ?? null, minus: (holding[0] ?? close[0])?.text ?? null };
   return reason.decision || reason.plus || reason.minus ? reason : null;
+}
+
+/**
+ * @typedef {{ requirement: string, importance: Importance, match: string, question: string }} PrepQuestion
+ */
+
+const QUESTION_BY_MATCH = {
+  strong: (r) => `Walk me through your strongest example of ${r}. What was the outcome?`,
+  partial: (r) => `Where have you used ${r}, and how deep did you go?`,
+  missing: (r) => `The role asks for ${r}. How would you close that gap?`,
+};
+
+/**
+ * Likely screening questions, one per important requirement, most important
+ * first. A requirement listed twice keeps only its most important entry. The match verdict picks the question: proof for a strong match,
+ * depth for a partial one, a gap plan for a missing one.
+ * @param {MachineSummary} s
+ * @param {number} [limit]
+ * @returns {PrepQuestion[]}
+ */
+export function prepQuestions(s, limit = 6) {
+  return s.requirements
+    .filter((r) => Object.hasOwn(QUESTION_BY_MATCH, r.match) && IMPORTANCE_RANK[r.importance] <= IMPORTANCE_RANK.meaningful)
+    .sort((a, b) => IMPORTANCE_RANK[a.importance] - IMPORTANCE_RANK[b.importance])
+    .filter((r, i, all) => all.findIndex((o) => o.requirement === r.requirement) === i)
+    .slice(0, limit)
+    .map((r) => ({ ...r, question: QUESTION_BY_MATCH[r.match](r.requirement) }));
 }
