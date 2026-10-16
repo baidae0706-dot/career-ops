@@ -28,9 +28,7 @@ def stat_text(pid, start="100", state="S", parent=1, group=1, session=1):
 
 class ReconcileReviewTests(unittest.TestCase):
     def setUp(self):
-        scratch = Path(__file__).resolve().parents[3] / ".career-ops-delivery-tests"
-        scratch.mkdir(exist_ok=True)
-        temporary = tempfile.TemporaryDirectory(dir=scratch)
+        temporary = tempfile.TemporaryDirectory(prefix="career-ops-delivery-")
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         remote_root = self.root.as_posix()

@@ -75,6 +75,49 @@ class CoordinatorTests(unittest.TestCase):
         self.assertEqual(self.run_cli("next")["action"], "implement")
         self.assertEqual(self.run_cli("next")["owner"], "codex-thread")
 
+    def test_queue_rejects_unknown_or_out_of_order_dependencies(self):
+        original = json.loads(self.queue.read_text())
+        for dependencies in ([99], [2]):
+            with self.subTest(dependencies=dependencies):
+                queue = json.loads(json.dumps(original))
+                queue["issues"][0]["dependencies"] = dependencies
+                write(self.queue, queue)
+                result = self.run_cli("init", self.queue, success=False)
+                self.assertIn("topologically ordered", result.stderr)
+                self.assertFalse(self.state.exists())
+
+    def test_unresolved_restored_dependencies_block_without_an_active_writer(self):
+        self.run_cli("init", self.queue)
+        state = self.run_cli("show")
+        # A resumed snapshot may lack prerequisite work. Absence is not proof
+        # of completion; the public CLI must fail closed even without a writer.
+        state["queue"] = [state["queue"][1]]
+        write(self.state, state)
+        self.assertIsNone(state["active"])
+        self.assertEqual(self.run_cli("next")["action"], "blocked")
+        self.run_cli("claim", "--issue", 2, "--owner", "codex-thread", "--operation", "blocked", success=False)
+        self.assertIsNone(self.run_cli("show")["active"])
+        state["queue"].append(dict(issue=3, title="feat(web): independent outcome", dependencies=[]))
+        write(self.state, state)
+        self.assertEqual(self.run_cli("next")["issue"], 3)
+
+    def test_invalid_queue_title_is_rejected_without_creating_state(self):
+        queue = json.loads(self.queue.read_text())
+        queue["issues"][0]["title"] = "Unnamed work"
+        write(self.queue, queue)
+        self.run_cli("init", self.queue, success=False)
+        self.assertFalse(self.state.exists())
+
+    def test_candidate_branch_must_name_the_active_issue(self):
+        checkout, path, request = self.candidate()
+        for branch in ("main", "chore/issue-2-delivery", "chore/issue-1-Uppercase"):
+            with self.subTest(branch=branch):
+                subprocess.check_call(["git", "branch", "-m", branch], cwd=checkout)
+                result = self.run_cli("candidate", path, "--checkout", checkout,
+                                      "--owner", "codex-thread", success=False)
+                self.assertIn("type/issue-N", result.stderr)
+                self.assertEqual(self.run_cli("next")["action"], "implement")
+
     def test_pending_review_cannot_be_replaced_after_restart_and_retry_is_durable(self):
         self.run_cli("init", self.queue)
         self.run_cli("claim", "--issue", 1, "--owner", "codex-thread", "--operation", "claim-1")
@@ -87,6 +130,51 @@ class CoordinatorTests(unittest.TestCase):
         action = self.run_cli("next")
         self.assertEqual(action["action"], "wait")
         self.assertEqual(action["reason"], "CLI session limit")
+
+    def test_heartbeat_is_quiet_for_empty_progress_and_unchanged_state_after_restart(self):
+        self.assertEqual(self.run_cli("heartbeat")["decision"], "DONT_NOTIFY")
+        self.assertFalse(self.state.exists())
+        checkout, path, request = self.candidate()
+        self.assertEqual(self.run_cli("heartbeat")["decision"], "DONT_NOTIFY")
+        self.run_cli("candidate", path, "--checkout", checkout, "--owner", "codex-thread")
+        self.run_cli("intent", "--kind", "review", "--operation", "review-1")
+        revision = self.run_cli("show")["revision"]
+        self.assertEqual(self.run_cli("heartbeat")["decision"], "DONT_NOTIFY")
+        self.assertEqual(self.run_cli("show")["revision"], revision)
+        self.run_cli("review", self.review_receipt(request, "CHANGES_REQUIRED"))
+        observed = self.run_cli("heartbeat")
+        self.assertEqual(observed["decision"], "NOTIFY")
+        self.assertIn("review_failed", observed["changes"])
+        # Every run_cli call is a fresh process reading the persisted observation.
+        self.assertEqual(self.run_cli("heartbeat")["decision"], "DONT_NOTIFY")
+
+    def test_heartbeat_first_observation_baselines_historical_failure(self):
+        checkout, path, request = self.candidate()
+        self.run_cli("candidate", path, "--checkout", checkout, "--owner", "codex-thread")
+        self.run_cli("intent", "--kind", "review", "--operation", "review-1")
+        self.run_cli("review", self.review_receipt(request, "CHANGES_REQUIRED"))
+        self.assertEqual(self.run_cli("heartbeat")["decision"], "DONT_NOTIFY")
+        self.assertEqual(self.run_cli("heartbeat")["decision"], "DONT_NOTIFY")
+
+    def test_heartbeat_reports_new_closure_completion_and_blocked_state_once(self):
+        self.run_cli("init", self.queue)
+        self.assertEqual(self.run_cli("heartbeat")["decision"], "DONT_NOTIFY")
+        state = self.run_cli("show")
+        # Durable snapshots are the input boundary, not a hidden test oracle.
+        state["queue"] = [state["queue"][1]]
+        write(self.state, state)
+        self.assertIn("needs_attention", self.run_cli("heartbeat")["changes"])
+        self.assertEqual(self.run_cli("heartbeat")["decision"], "DONT_NOTIFY")
+        state = self.run_cli("show")
+        state["completed"] = {"2": dict(closed=True, issue=2, head="a" * 40)}
+        write(self.state, state)
+        observed = self.run_cli("heartbeat")
+        self.assertEqual(observed["decision"], "NOTIFY")
+        self.assertEqual(observed["completed_issues"], [2])
+        self.assertEqual(observed["changes"], ["issue_completed", "queue_completed"])
+        revision = self.run_cli("show")["revision"]
+        self.assertEqual(self.run_cli("heartbeat")["decision"], "DONT_NOTIFY")
+        self.assertEqual(self.run_cli("show")["revision"], revision)
 
     def test_revision_conflict_does_not_acquire_a_writer(self):
         self.run_cli("init", self.queue)
@@ -121,7 +209,7 @@ class CoordinatorTests(unittest.TestCase):
                         parent_digest="c" * 64 if request.get("parent_issue") else None,
                         head_before=request["head_sha"], head_after=request["head_sha"],
                         dirty_before="", dirty_after="", process_exit=0, model_error=False,
-                        session_id=session, init_session_id=session, skill=dict(name=request["review_skill"], loaded=True),
+                        session_id=session, init_session_id=session, skill=dict(name=request["review_skill"], loaded=True, mechanism="Skill", tool_use_id="load", session_id=session, args=request["base_sha"], call_event=1, result_event=2, call_message_id="load-batch"),
                         parent_models=[request["expected_model"]], agents_invoked=["standards-reviewer", "spec-reviewer"],
                         subagent_models={"standards":[request["expected_model"]],"spec":[request["expected_model"]]},
                         checks={"checks":dict(exit_code=0,host="windows",argv=request["checks"][0]["argv"],head_sha=request["head_sha"],log="checks.log")}, axes={})
@@ -131,8 +219,9 @@ class CoordinatorTests(unittest.TestCase):
             write(folder / f"{axis}.json", child)
             (folder / f"{axis}.txt").write_text("actual child output")
             (folder / f"{axis}-transcript.jsonl").write_text("actual transcript")
-            evidence["axes"][axis] = dict(**child, models=[request["expected_model"]], agent_id=axis,tool_use_id=axis,
+            evidence["axes"][axis] = dict(**child, models=[request["expected_model"]], agent_id=axis,tool_use_id=axis, call_event=3, call_message_id="review-batch", session_id=session, run_in_background=False,
                                           completed=True,report=f"{axis}.json",raw_report=f"{axis}.txt",transcript=f"{axis}-transcript.jsonl")
+        (folder / "stream.jsonl").write_text("Synthetic parent stream fixture\n")
         write(folder / "request.json", request)
         write(folder / "report.json", report)
         evidence["files"] = files_index(folder, [p.name for p in folder.iterdir()])

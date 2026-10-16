@@ -45,29 +45,47 @@ def response_models(records):
     return sorted(models)
 
 
+def parent_events(records):
+    """Only this run's initialized parent stream can authorize its review."""
+    initialized = next(((index, event) for index, event in enumerate(records)
+                        if event.get("type") == "system" and event.get("subtype") == "init"), None)
+    if initialized is None:
+        return
+    start, init = initialized
+    session = init.get("session_id")
+    if not isinstance(session, str) or not session:
+        return
+    for index, event in enumerate(records):
+        if (index > start and event.get("session_id") == session
+                and event.get("parent_tool_use_id") is None and event.get("type") in ("assistant", "user")):
+            yield index, event
+
+
 def skill_receipt(records, skill):
     """Only a successful Skill result or CLI command expansion proves loading."""
-    calls = set()
-    for event in records:
+    calls, expansion = {}, None
+    for index, event in parent_events(records):
         content = message(event).get("content", [])
         for block in message_blocks(event):
             if not isinstance(block, dict):
                 continue
-            if block.get("type") == "tool_use" and block.get("name") == "Skill":
+            if event.get("type") == "assistant" and block.get("type") == "tool_use" and block.get("name") == "Skill":
                 data = block.get("input", {})
                 if isinstance(data, dict) and data.get("skill", "").lstrip("/") == skill.lstrip("/"):
-                    calls.add(block.get("id"))
-            if block.get("type") == "tool_result" and block.get("tool_use_id") in calls:
+                    calls[block.get("id")] = dict(call_event=index, call_message_id=message(event).get("id"),
+                                                args=data.get("args"), session_id=event["session_id"])
+            if event.get("type") == "user" and block.get("type") == "tool_result" and block.get("tool_use_id") in calls:
                 text = content_text(block.get("content"))
                 if text and not block.get("is_error") and not any(s in text for s in ("disable-model-invocation", "Unknown skill", "not allowed")):
-                    return dict(name=skill, loaded=True, tool_use_id=block["tool_use_id"], mechanism="Skill")
+                    return dict(name=skill, loaded=True, tool_use_id=block["tool_use_id"], mechanism="Skill",
+                                result_event=index, **calls[block["tool_use_id"]])
         # CLI expands an explicit slash entry as a user skill message. The full
         # expansion (including the skill base directory) must be in the stream.
         if event.get("type") == "user":
             text = content_text(content)
             if f"<command-name>/{skill.lstrip('/')}</command-name>" in text and "Base directory for this skill:" in text:
-                return dict(name=skill, loaded=True, mechanism="explicit-slash-expansion")
-    return dict(name=skill, loaded=False)
+                expansion = dict(name=skill, loaded=True, mechanism="explicit-slash-expansion")
+    return expansion or dict(name=skill, loaded=False)
 
 
 def content_text(content):
@@ -80,19 +98,20 @@ def content_text(content):
 
 def axis_receipts(records, subdir, folder):
     calls, results = {}, {}
-    for event in records:
+    for index, event in parent_events(records):
         for block in message_blocks(event):
             if not isinstance(block, dict):
                 continue
-            if block.get("type") == "tool_use" and block.get("name") in ("Agent", "Task"):
+            if event.get("type") == "assistant" and block.get("type") == "tool_use" and block.get("name") in ("Agent", "Task"):
                 data = block.get("input", {})
                 axis = {"standards-reviewer": "standards", "spec-reviewer": "spec"}.get(data.get("subagent_type"))
                 if axis:
-                    calls[block["id"]] = (axis, data)
-            elif block.get("type") == "tool_result":
+                    calls[block["id"]] = (axis, data, dict(call_event=index, call_message_id=message(event).get("id"),
+                                                        session_id=event["session_id"], run_in_background=data.get("run_in_background")))
+            elif event.get("type") == "user" and block.get("type") == "tool_result":
                 results[block.get("tool_use_id")] = block
     receipts = {}
-    for call_id, (axis, data) in calls.items():
+    for call_id, (axis, data, invocation) in calls.items():
         # The latest attempt for an axis must complete; an old PASS cannot hide a failed retry.
         receipts.pop(axis, None)
         result = results.get(call_id, {})
@@ -122,5 +141,5 @@ def axis_receipts(records, subdir, folder):
         (folder / transcript_name).write_bytes(transcript.read_bytes())
         receipts[axis] = dict(tool_use_id=call_id, agent_id=agent_id, completed=True, models=models,
                               report=report_name, raw_report=raw_name, status=child.get("status"),
-                              summary=child.get("summary"), findings=child.get("findings"), transcript=transcript_name)
+                              summary=child.get("summary"), findings=child.get("findings"), transcript=transcript_name, **invocation)
     return receipts

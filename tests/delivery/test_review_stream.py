@@ -32,9 +32,12 @@ class StreamTests(unittest.TestCase):
         call = {"type":"assistant","message":{"content":[{"type":"tool_use","id":"skill-call","name":"Skill","input":{"skill":"matt-code-review"}}]}}
         refused = {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"skill-call","is_error":True,"content":"disable-model-invocation"}]}}
         passed = {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"skill-call","content":"Base directory for this skill: /skills/matt-code-review\nTwo independent axes"}]}}
+        init = dict(type="system", subtype="init", session_id="current")
+        for event in (prompt, call, refused, passed):
+            event["session_id"] = "current"
         self.assertFalse(skill_receipt([prompt], "matt-code-review")["loaded"])
-        self.assertFalse(skill_receipt([prompt,call,refused], "matt-code-review")["loaded"])
-        self.assertTrue(skill_receipt([prompt,call,passed], "matt-code-review")["loaded"])
+        self.assertFalse(skill_receipt([init,prompt,call,refused], "matt-code-review")["loaded"])
+        self.assertTrue(skill_receipt([init,prompt,call,passed], "matt-code-review")["loaded"])
 
 
 if __name__ == "__main__":

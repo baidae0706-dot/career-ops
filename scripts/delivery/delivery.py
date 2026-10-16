@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from review_gate import digest, gate, spec_digest, validate_request, verify_files
+from review_gate import digest, gate, spec_digest, validate_request, verify_files, validate_title, validate_branch
 
 HERE = Path(__file__).resolve().parent
 
@@ -99,18 +99,28 @@ def gh(config, *args):
 
 def live_candidate(config, request):
     pr = gh(config, "pr", "view", str(request["pr"]), "--json",
-            "headRefOid,baseRefName,state,isDraft,mergeable,statusCheckRollup")
+            "headRefOid,headRefName,title,baseRefName,state,isDraft,mergeable,statusCheckRollup")
     # gh 2.45 does not expose baseRefOid in pr view. Obtain the same pinned
     # identity from the REST pull endpoint and reject cross-read drift.
     if "baseRefOid" not in pr:
         identity = json.loads(output(["gh", "api", f"repos/{config['repo']}/pulls/{request['pr']}"]))
         if (identity["head"]["sha"], identity["base"]["ref"]) != (pr["headRefOid"], pr["baseRefName"]):
             raise RuntimeError("Live PR identity changed between metadata reads")
+        if (identity["head"]["ref"], identity["title"]) != (pr["headRefName"], pr["title"]):
+            raise RuntimeError("Live PR naming changed between metadata reads")
         pr["baseRefOid"] = identity["base"]["sha"]
     if (pr["headRefOid"], pr["baseRefOid"], pr["baseRefName"]) != (
         request["head_sha"], request["target_base_sha"], request["target_branch"]
     ):
         raise RuntimeError("Live PR candidate differs from pinned request")
+    issue = gh(config, "issue", "view", str(request["issue"]), "--json", "number,title")
+    if issue.get("number") != request["issue"]:
+        raise ValueError("Live Issue identity differs from the requested Issue")
+    validate_title(issue.get("title"))
+    validate_title(pr.get("title"))
+    validate_branch(pr.get("headRefName"), request["issue"])
+    if pr["title"] != issue["title"]:
+        raise ValueError("PR title must exactly match its live Issue title")
     return pr
 
 
@@ -126,6 +136,7 @@ def prepare(config, source, checkout, folder):
         raise RuntimeError("Local candidate SHA mismatch")
     if output(["git", "status", "--porcelain"], checkout):
         raise RuntimeError("Local candidate is dirty; preserve it")
+    live_candidate(config, request)
     folder.mkdir(parents=True, exist_ok=False)
     write(folder / "request.json", request)
     try:
@@ -203,20 +214,62 @@ print(json.dumps(s,ensure_ascii=False))
 
 
 def collect(config, run, folder):
+    if not re.fullmatch(r"issue-\d+-[a-f0-9]{12}-r\d+", run):
+        raise ValueError("Invalid run ID")
     current = status(config, run, emit=False)
-    if current.get("stage") not in ("completed", "error") or current.get("worker_alive") or current.get("model_alive"):
+    if (current.get("stage") not in ("completed", "error")
+            or current.get("worker_alive") is not False or current.get("model_alive") is not False):
         raise RuntimeError("Only a terminal, stopped original round may be collected")
+    if current.get("run_id") != run:
+        raise RuntimeError("Terminal round identity differs from requested run")
+    # Snapshot ordinary files through the existing read-only channel. Explicit
+    # filenames avoid legacy Windows SCP's rejection of a recursive '/.' source.
+    code = f'''import hashlib,json,pathlib
+folder=pathlib.Path({config['remote_root']!r})/'runs'/{run!r}
+if folder.is_symlink() or not folder.is_dir():
+ raise ValueError('Original round must be an ordinary directory')
+files={{}}
+for path in folder.iterdir():
+ if path.is_symlink() or not path.is_file():
+  raise ValueError('Original round contains a non-regular artifact')
+ files[path.name]=hashlib.sha256(path.read_bytes()).hexdigest()
+print(json.dumps({{'files':files}}))
+'''
+    manifest = json.loads(remote(config, code)).get("files")
+    if not isinstance(manifest, dict) or not {"request.json", "evidence.json", "status.json"} <= set(manifest):
+        raise RuntimeError("Transport manifest is incomplete")
+    reserved = {"CON", "PRN", "AUX", "NUL", *[f"COM{i}" for i in range(1, 10)], *[f"LPT{i}" for i in range(1, 10)]}
+    seen = set()
+    for name, checksum in manifest.items():
+        if (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,239}", name)
+                or name.endswith(".") or name.split(".")[0].upper() in reserved
+                or name.casefold() in seen or name.casefold() == "collection.json"
+                or not isinstance(checksum, str) or not re.fullmatch(r"[a-f0-9]{64}", checksum)):
+            raise RuntimeError("Unsafe or ambiguous transport filename or digest")
+        seen.add(name.casefold())
     folder.mkdir(parents=True, exist_ok=False)
-    subprocess.run(["scp", "-O", "-q", "-o", "ConnectTimeout=15", "-r",
-                    f"{config['ssh_host']}:{config['remote_root']}/runs/{run}/.", str(folder)], check=True)
+    for name in sorted(manifest):
+        subprocess.run(["scp", "-O", "-q", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
+                        f"{config['ssh_host']}:{config['remote_root']}/runs/{run}/{name}", str(folder / name)],
+                       check=True, timeout=120)
+    if any((folder / name).is_symlink() for name in manifest):
+        raise RuntimeError("Collected artifact must not be a symbolic link")
     evidence = read(folder / "evidence.json")
-    problems = verify_files(folder, evidence.get("files"))
+    problems = verify_files(folder, manifest) + verify_files(folder, evidence.get("files"))
     if problems:
         raise RuntimeError(f"Receipt is incomplete or changed: {problems}; preserve it and collect into a fresh directory")
-    collected = read(folder / "status.json")
-    if any(collected.get(key) != current.get(key) for key in ("run_id", "request_digest", "finished", "stage")):
+    request, collected = read(folder / "request.json"), read(folder / "status.json")
+    validate_request(request, config)
+    if (run_id(request) != run or digest(request) != current.get("request_digest")
+            or digest(request) != evidence.get("request_digest")):
+        raise RuntimeError("Collected request differs from the terminal round identity")
+    after = status(config, run, emit=False)
+    keys = ("run_id", "request_digest", "finished", "stage", "verdict", "session_id")
+    if (any(collected.get(key) != current.get(key) or after.get(key) != current.get(key) for key in keys)
+            or after.get("worker_alive") is not False or after.get("model_alive") is not False):
         raise RuntimeError("Terminal status changed during collection")
-    write(folder / "collection.json", dict(status=current, request_digest=evidence.get("request_digest")))
+    write(folder / "collection.json", dict(status=current, request_digest=evidence.get("request_digest"),
+                                           transport_files=manifest))
     print(json.dumps(dict(directory=str(folder), run_id=run)))
 
 

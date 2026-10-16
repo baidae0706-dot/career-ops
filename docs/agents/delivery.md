@@ -83,6 +83,44 @@ python scripts/delivery/coordinator.py merge --issue N
 python scripts/delivery/coordinator.py next
 ```
 
+## Naming and notification decisions
+
+The repository is the exact `owner/name` in project.json, with its GitHub origin
+checked on the VPS. Issues and PRs use `type(scope): outcome`; the live PR title
+must exactly match its live Issue title. The live head branch must match
+`type/issue-N-clear-description` for that Issue. Queue intake and local candidate
+registration reject invalid names; prepare, dispatch, remote review and premerge
+also recheck the live GitHub names. Naming never substitutes for SHA or digest
+identity.
+
+A review run is `issue-N-HEAD12-rR`, where HEAD12 is the candidate SHA prefix and R
+is the increasing round. Check names are unique lowercase identifiers of up to
+64 characters using letters, digits and hyphens; their logs are
+`windows-NAME.log` or `linux-NAME.log`. Round controls use fixed names including
+`request.json`, `status.json`, `evidence.json`, `report.json`, `stream.jsonl`, and
+`collection.json`. Axis reports use `standards-*` and `spec-*`. Transport accepts
+only distinct ASCII basenames, rejects Windows device names, path syntax and
+case aliases, and verifies every SHA-256, including the status and evidence
+controls. The caller selects a fresh local receipt directory (recommended
+`RUN-receipt` with a descriptive suffix when retrying). Its identity is verified
+from the request and collection record. The adjacent `RECEIPT.finish` directory
+contains the finish journal, `closure.json` and `acceptance.md`.
+
+Fork-owned `scripts/delivery/` is declared in the committed, explicitly unignored
+`config/local-paths.txt`, following DATA_CONTRACT.md. The official updater thus
+preserves it without editing SYSTEM_PATHS. Git upstream integration still needs
+its separate review and validation.
+
+At the end of a continuation, invoke `coordinator.py --state STATE heartbeat`
+exactly once, before deciding the app reply. It returns `NOTIFY` or `DONT_NOTIFY`
+plus the reason and meaningful changes. Its first observation establishes a
+quiet baseline; missing state, ordinary implementation/review progress and
+unchanged observations remain quiet. New Issue closure, queue completion, review
+failure or a blocked/retry condition can notify once. The observation persists
+across CLI restarts and ignores revision and clock noise. The existing Codex app
+heartbeat owns scheduling and message display; this command only decides whether
+a new notification is warranted and does not run models or implement work.
+
 ## Recovery and evidence
 
 The coordinator holds an OS lock while it reads and replaces state. State includes
@@ -96,7 +134,11 @@ For `reconcile`, inspect the recorded operation. A review resumes the same run I
 `delivery.py reconcile RUN` can seal an interrupted round only after acquiring
 its original worker lock and proving the recorded worker/model processes and
 related log holders have stopped. It preserves raw evidence and session identity,
-then records `INSUFFICIENT` for collection and a new review round. A busy lock,
+then records `INSUFFICIENT` for collection and a new review round. Collection
+requires explicitly stopped worker and model observations, pins ordinary remote
+files, transfers explicit filenames with SCP, and rechecks the terminal identity.
+A failed transfer preserves its partial directory; retry the same run into a new
+directory without relaunching it or overwriting evidence. A busy lock,
 unknown process identity or uncertain launch remains pending, never relaunched.
 A merge reruns `merge --issue N`, which reads actual PR/merge/comment/closure
 state. The finish journal lives beside the immutable review receipt. A provably
@@ -108,6 +150,12 @@ complete readback, never resent. A timeout alone proves no outcome. A cleanup
 marker blocks recovery until the original process tree is confirmed stopped;
 deleting the marker alone is not recovery evidence. Retain evidence and retry;
 never label an unknown action successful or launch a replacement blindly.
+
+The review gate derives invocation order and assistant message identities from
+this round's initialized parent stream. A successful actual Skill result for the
+fixed base must precede both foreground axes. Both calls must share the same
+assistant message ID, even when streamed as separate events. Nested child events,
+other sessions and historical slash expansions cannot satisfy this protocol.
 
 Receipt verification pins repo, Issue/parent spec, PR, full head/base/target base,
 check commands and hosts, actual parent/child model IDs, session, both completed
@@ -122,6 +170,10 @@ Python/Git/gh/Claude versions and the installed review skill hash. Keep the norm
 CLI authentication; no credential copying. The worker reads user settings only,
 disables hooks and MCP, and exposes read/search/independent-agent/skill tools.
 It cannot intentionally edit the candidate; before/after Git checks still apply.
+The reviewer must first call the actual Skill tool with the pinned skill and base,
+wait for successful loading, then start both foreground review agents in the same
+batch with the complete standards and smell baseline. A slash-looking prompt is
+not skill-load proof; a failed Skill result remains insufficient evidence.
 
 ## Verification
 

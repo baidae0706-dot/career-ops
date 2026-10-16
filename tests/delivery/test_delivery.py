@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 
 from delivery import CleanupError, execute_checks, files_index, live_candidate, premerge, terminate_tree, write
 from review_gate import IDENTITY, digest, gate, spec_digest, validate_request, verify_files, repository_matches
-from review_protocol import axis_receipts, session_arguments, validate_session_model
+from review_protocol import axis_receipts, session_arguments, validate_session_model, skill_receipt
 
 
 class DeliveryTests(unittest.TestCase):
@@ -30,17 +30,85 @@ class DeliveryTests(unittest.TestCase):
                            acceptance=[dict(index=1, status="PASS", evidence="windows-check.log")])
         self.evidence = dict(request_digest=digest(self.request), head_before="b"*40, head_after="b"*40,
                              dirty_before="", dirty_after="", process_exit=0, model_error=False,
-                             session_id="session", init_session_id="session", skill=dict(name="matt-code-review", loaded=True),
+                             session_id="session", init_session_id="session", skill=dict(name="matt-code-review", loaded=True, mechanism="Skill", tool_use_id="load", session_id="session", args=self.request["base_sha"], call_event=1, result_event=2, call_message_id="load-batch"),
                              parent_models=["claude-opus-5-5"], agents_invoked=["standards-reviewer", "spec-reviewer"],
                              subagent_models={"a":["claude-opus-5-5"], "b":["claude-opus-5-5"]},
                              checks={"check":dict(exit_code=0, host="windows", argv=["check", "--all"], head_sha="b"*40,
-                                                  log="windows-check.log")}, files={"windows-check.log":"fake"})
+                                                  log="windows-check.log")}, files={"windows-check.log":"fake", "stream.jsonl":"fake"})
         self.evidence["axes"] = {}
         for axis in ("standards", "spec"):
-            self.evidence["axes"][axis] = dict(tool_use_id=axis, agent_id=axis, completed=True,
+            self.evidence["axes"][axis] = dict(tool_use_id=axis, agent_id=axis, completed=True, call_event=3, call_message_id="review-batch", session_id="session", run_in_background=False,
                 models=["claude-opus-5-5"], status="PASS", summary="Independent full report", findings=[],
                 report=f"{axis}-child.json", raw_report=f"{axis}-child.txt", transcript=f"{axis}-transcript.jsonl")
             self.evidence["files"].update({f"{axis}-child.json":"fake", f"{axis}-child.txt":"fake", f"{axis}-transcript.jsonl":"fake"})
+
+    def test_gate_requires_actual_skill_before_one_parent_tool_batch(self):
+        def tool(identifier, name, data, batch):
+            return dict(type="assistant", session_id="session", parent_tool_use_id=None, message=dict(id=batch,
+                content=[dict(type="tool_use", id=identifier, name=name, input=data)]))
+
+        def result(identifier, text, **extra):
+            return dict(type="user", session_id="session", parent_tool_use_id=None, message=dict(content=[
+                dict(type="tool_result", tool_use_id=identifier, content=text, **extra)]))
+
+        skill = tool("load", "Skill", dict(skill="matt-code-review", args=self.request["base_sha"]), "load-batch")
+        loaded = result("load", "Base directory for this skill: /skills/matt-code-review\nReview standards")
+        standards = tool("standards", "Task", dict(subagent_type="standards-reviewer", run_in_background=False), "review-batch")
+        spec = tool("spec", "Agent", dict(subagent_type="spec-reviewer", run_in_background=False), "review-batch")
+        child = lambda axis: dict(axis=axis, status="PASS", summary="Independent review", findings=[])
+        standards_done = result("standards", json.dumps(child("standards")) + "\nagentId: standards")
+        spec_done = result("spec", json.dumps(child("spec")) + "\nagentId: spec")
+        # The actual CLI can split one message's calls across events and interleave
+        # child progress/results. message.id, not the stream row, defines a batch.
+        valid = [skill, loaded, standards, standards_done, spec, spec_done]
+        variants = {
+            "split-events-same-parent-message": (valid, True),
+            "missing-skill": (valid[2:], False),
+            "failed-skill": ([skill, result("load", "disabled", is_error=True), *valid[2:]], False),
+            "late-skill": ([*valid[2:], skill, loaded], False),
+            "skill-before-init": ([skill, loaded, dict(type="system", subtype="init", session_id="session"), *valid[2:]], False),
+            "slash-only": ([dict(type="user", session_id="session", message=dict(content="<command-name>/matt-code-review</command-name> Base directory for this skill: /skills/review")), *valid[2:]], False),
+        }
+        for name in ("serial-batches", "background-axis", "missing-message-id", "wrong-skill-base", "nested-skill", "nested-axis", "old-session-skill", "old-session-axis", "skill-and-axes-one-batch"):
+            records = copy.deepcopy(valid)
+            if name == "serial-batches":
+                records[4]["message"]["id"] = "later-review-batch"
+            elif name == "background-axis":
+                records[4]["message"]["content"][0]["input"]["run_in_background"] = True
+            elif name == "missing-message-id":
+                records[4]["message"].pop("id")
+            elif name == "wrong-skill-base":
+                records[0]["message"]["content"][0]["input"]["args"] = "another-base"
+            elif name == "nested-skill":
+                records[0]["parent_tool_use_id"] = records[1]["parent_tool_use_id"] = "outer-child"
+            elif name == "nested-axis":
+                records[4]["parent_tool_use_id"] = records[5]["parent_tool_use_id"] = "outer-child"
+            elif name == "skill-and-axes-one-batch":
+                records[0]["message"]["id"] = "review-batch"
+            elif name == "old-session-skill":
+                records[0]["session_id"] = records[1]["session_id"] = "previous-session"
+            elif name == "old-session-axis":
+                records[4]["session_id"] = records[5]["session_id"] = "previous-session"
+            variants[name] = (records, False)
+        for name, (records, passes) in variants.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                for axis in ("standards", "spec"):
+                    # JSONL uses compact single-line records.
+                    (root / f"agent-{axis}.jsonl").write_text(json.dumps(dict(type="assistant", message=dict(model="claude-opus-5-5"))) + "\n")
+                if not any(event.get("subtype") == "init" for event in records):
+                    records = [dict(type="system", subtype="init", session_id="session"), *records]
+                evidence = copy.deepcopy(self.evidence)
+                evidence["skill"] = skill_receipt(records, self.request["review_skill"])
+                evidence["axes"] = axis_receipts(records, root, root)
+                (root / "stream.jsonl").write_text("\n".join(map(json.dumps, records)) + "\n")
+                evidence["files"].update(files_index(root, [p.name for p in root.iterdir()]))
+                problems = gate(self.request, self.report, evidence)
+                if passes:
+                    self.assertEqual(problems, [])
+                    self.assertEqual(evidence["axes"]["standards"]["call_message_id"], evidence["axes"]["spec"]["call_message_id"])
+                else:
+                    self.assertTrue(problems, "Invalid parent protocol must not authorize merge")
 
     def test_complete_evidence(self):
         validate_request(self.request, self.config)
@@ -141,12 +209,14 @@ class DeliveryTests(unittest.TestCase):
             self.assertTrue(verify_files(root,{"missing":"hash"}))
 
     def test_live_candidate_changed_base_head_or_branch(self):
-        pr=dict(headRefOid="b"*40,baseRefOid="a"*40,baseRefName="main")
-        with patch("delivery.gh", return_value=pr):
-            self.assertEqual(live_candidate(self.config,self.request),pr)
-        for change in (dict(headRefOid="c"*40),dict(baseRefOid="c"*40),dict(baseRefName="wrong")):
-            with patch("delivery.gh",return_value={**pr,**change}), self.assertRaises(RuntimeError):
-                live_candidate(self.config,self.request)
+        pr = dict(headRefOid="b"*40, baseRefOid="a"*40, baseRefName="main",
+                  headRefName=f"chore/issue-{self.request['issue']}-delivery", title="chore(delivery): outcome")
+        issue = dict(number=self.request["issue"], title=pr["title"])
+        with patch("delivery.gh", side_effect=[pr, issue]):
+            self.assertEqual(live_candidate(self.config, self.request), pr)
+        for change in (dict(headRefOid="c"*40), dict(baseRefOid="c"*40), dict(baseRefName="wrong")):
+            with patch("delivery.gh", return_value={**pr, **change}), self.assertRaises(RuntimeError):
+                live_candidate(self.config, self.request)
 
     def test_premerge_rejects_changed_spec_or_failed_ci(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -157,6 +227,7 @@ class DeliveryTests(unittest.TestCase):
                 (root/f"{axis}-child.txt").write_text("raw independent report")
                 (root/f"{axis}-transcript.jsonl").write_text("actual transcript")
             evidence=copy.deepcopy(self.evidence)
+            (root / "stream.jsonl").write_text("Synthetic parent stream fixture\n")
             evidence["files"]=files_index(root,list(evidence["files"]))
             evidence["issue_digest"]=spec_digest(dict(title="old",body="req",comments=[]))
             for name,value in (("request",self.request),("report",self.report),("evidence",evidence),("status",dict(verdict="PASS"))):
@@ -181,13 +252,15 @@ class DeliveryTests(unittest.TestCase):
             (root/"agent-testid.jsonl").write_text(json.dumps(dict(type="assistant",message=dict(model="claude-opus-test"))))
             call=dict(type="tool_use",id="call",name="Agent",input=dict(subagent_type="spec-reviewer"))
             result=dict(type="tool_result",tool_use_id="call",content=json.dumps(child)+"\nagentId: testid")
-            records=[dict(message=dict(content=[call])),dict(message=dict(content=[result]))]
+            records=[dict(type="system", subtype="init", session_id="current"),
+                     dict(type="assistant", session_id="current", message=dict(id="batch",content=[call])),
+                     dict(type="user", session_id="current", message=dict(content=[result]))]
             axes=axis_receipts(records,root,root)
             self.assertEqual(axes["spec"]["agent_id"],"testid")
             self.assertEqual(axes["spec"]["tool_use_id"],"call")
             self.assertNotIn("standards",axes)
             retry=dict(type="tool_use",id="retry",name="Agent",input=dict(subagent_type="spec-reviewer"))
-            self.assertEqual(axis_receipts(records+[dict(message=dict(content=[retry]))],root,root),{})
+            self.assertEqual(axis_receipts(records+[dict(type="assistant", session_id="current", message=dict(id="retry-batch",content=[retry]))],root,root),{})
             result["is_error"]=True
             self.assertEqual(axis_receipts(records,root,root),{})
             result["is_error"]=False

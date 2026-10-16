@@ -277,3 +277,6 @@ data/interview-prep/
 /local/
 __pycache__/
 *.pyc
+
+# Commit the fork declaration so clean CI checkouts preserve local tooling.
+!config/local-paths.txt

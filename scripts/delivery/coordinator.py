@@ -15,7 +15,7 @@ from pathlib import Path
 
 from delivery import HERE, read, write, output, run_id, files_index
 from review_gate import (IDENTITY, digest, gate, validate_request, verify_files, review_model,
-                         codex_gate, review_contract, review_context_digest)
+                         codex_gate, review_contract, review_context_digest, validate_title, validate_branch)
 
 
 @contextlib.contextmanager
@@ -50,8 +50,7 @@ def validate_queue(queue):
         raise ValueError("Unique positive Issue numbers required")
     visited = set()
     for item in issues:
-        if not re.fullmatch(r"[a-z]+\([a-z0-9-]+\): .+", item.get("title", "")):
-            raise ValueError("Issue title must name a clear type(scope): outcome")
+        validate_title(item.get("title"))
         dependencies = item.get("dependencies", [])
         if not isinstance(dependencies, list) or not set(dependencies).issubset(visited):
             raise ValueError("Queue must be topologically ordered with known dependencies")
@@ -71,6 +70,40 @@ def next_action(state):
         if str(item["issue"]) not in completed and all(str(d) in completed for d in item["dependencies"]):
             return dict(action="claim", issue=item["issue"], title=item["title"])
     return dict(action="complete" if len(completed) == len(state["queue"]) else "blocked")
+
+
+def heartbeat(state, args):
+    """Persist notification decisions only; the existing app owns scheduling."""
+    active = state.get("active") or {}
+    completed = sorted(int(number) for number, receipt in state["completed"].items() if receipt.get("closed"))
+    failures = sorted(digest({key: review.get(key) for key in
+        ("request_digest", "evidence_digest", "status_digest", "role", "verdict")})
+        for review in active.get("reviews", []) if review.get("verdict") in ("CHANGES_REQUIRED", "INSUFFICIENT"))
+    action = next_action(state)["action"]
+    attention = {"action": "blocked"} if action == "blocked" else None
+    if active.get("retry_at"):
+        attention = dict(issue=active["issue"], reason=active.get("retry_reason"),
+                         evidence=active.get("retry_evidence"))
+    elif active.get("stage") == "review-retry" and not failures:
+        attention = dict(issue=active["issue"], action="review-retry")
+    observed = dict(completed=completed, failures=failures, attention=attention,
+                    complete=bool(state["queue"]) and action == "complete")
+    previous = state.get("heartbeat_observation")
+    state["heartbeat_observation"] = observed
+    changes, newly_completed = [], []
+    if previous is not None:
+        newly_completed = sorted(set(completed) - set(previous["completed"]))
+        if newly_completed:
+            changes.append("issue_completed")
+        if observed["complete"] and not previous["complete"]:
+            changes.append("queue_completed")
+        if set(failures) - set(previous["failures"]):
+            changes.append("review_failed")
+        if attention is not None and attention != previous["attention"]:
+            changes.append("needs_attention")
+    return dict(decision="NOTIFY" if changes else "DONT_NOTIFY", changes=changes,
+                completed_issues=newly_completed,
+                reason="meaningful_change" if changes else "baseline" if previous is None else "unchanged_or_in_progress")
 
 
 def claim(state, args):
@@ -139,8 +172,7 @@ def record_candidate(state, args):
     if output(["git", "rev-parse", "HEAD"], checkout) != request["head_sha"] or output(["git", "status", "--porcelain"], checkout):
         raise ValueError("Candidate is dirty or HEAD differs from request")
     branch = output(["git", "branch", "--show-current"], checkout)
-    if not re.fullmatch(rf"[a-z]+/issue-{active['issue']}-[a-z0-9]+(?:-[a-z0-9]+)*", branch):
-        raise ValueError("Branch must use type/issue-N-clear-description")
+    validate_branch(branch, active["issue"])
     if output(["git", "merge-base", request["target_base_sha"], request["head_sha"]], checkout) != request["target_base_sha"]:
         raise ValueError("Review an integration candidate containing the target base")
     if review_model(request) != "opus":
@@ -299,6 +331,7 @@ def main():
     commands.add_parser("init").add_argument("queue", type=Path)
     commands.add_parser("next")
     commands.add_parser("show")
+    commands.add_parser("heartbeat")
     command = commands.add_parser("claim")
     command.add_argument("--issue", type=int, required=True)
     command.add_argument("--owner", required=True)
@@ -324,6 +357,9 @@ def main():
     command.add_argument("--owner", required=True)
     args = parser.parse_args()
     config = read(args.config)
+    if args.command == "heartbeat" and not args.state.exists():
+        print(json.dumps(dict(decision="DONT_NOTIFY", reason="empty", changes=[], completed_issues=[])))
+        return
     with state_lock(args.state):
         if args.command == "init":
             if args.state.exists():
@@ -343,9 +379,13 @@ def main():
             if args.command in ("next", "show"):
                 print(json.dumps(next_action(state) if args.command == "next" else state))
                 return
+            previous_observation = state.get("heartbeat_observation")
             result = {"claim": claim, "intent": record_intent, "retry": record_retry,
-                      "candidate": record_candidate, "review": record_review,
+                      "candidate": record_candidate, "review": record_review, "heartbeat": heartbeat,
                       "accept": record_acceptance, "merge": merge_candidate}[args.command](state, args)
+            if args.command == "heartbeat" and previous_observation == state["heartbeat_observation"]:
+                print(json.dumps(result))
+                return
         state["revision"] += 1
         state["events"].append(dict(revision=state["revision"], time=time.time(), command=args.command, result=result))
         write(args.state, state)

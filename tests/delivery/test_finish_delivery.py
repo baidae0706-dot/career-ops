@@ -39,9 +39,7 @@ class FakeMutationProcess:
 
 class FinishDeliveryTests(unittest.TestCase):
     def setUp(self):
-        scratch = Path(__file__).resolve().parents[3] / ".career-ops-delivery-tests"
-        scratch.mkdir(parents=True, exist_ok=True)
-        self.temp = tempfile.TemporaryDirectory(dir=scratch)
+        self.temp = tempfile.TemporaryDirectory(prefix="career-ops-delivery-")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.checkout = self.root / "checkout"
@@ -73,11 +71,11 @@ class FinishDeliveryTests(unittest.TestCase):
                            spec=dict(status="PASS", summary="Specification reviewed"),
                            acceptance=[dict(index=1, status="PASS", evidence="linux-check.log")])
         self.codex = {**copy.deepcopy(self.report), "request_digest": digest(self.request)}
-        self.spec = dict(title="A bounded ticket", body="A complete requirement", comments=[])
+        self.spec = dict(title="chore(delivery): a bounded ticket", body="A complete requirement", comments=[])
         self.evidence = dict(request_digest=digest(self.request), head_before=self.head,
                              head_after=self.head, dirty_before="", dirty_after="",
                              process_exit=0, model_error=False, session_id="session",
-                             init_session_id="session", skill=dict(name="matt-code-review", loaded=True),
+                             init_session_id="session", skill=dict(name="matt-code-review", loaded=True, mechanism="Skill", tool_use_id="load", session_id="session", args=self.base, call_event=1, result_event=2, call_message_id="load-batch"),
                              parent_models=["claude-opus-5-5"],
                              agents_invoked=["standards-reviewer", "spec-reviewer"],
                              subagent_models={"a": ["claude-opus-5-5"], "b": ["claude-opus-5-5"]},
@@ -88,13 +86,14 @@ class FinishDeliveryTests(unittest.TestCase):
         self.folder.mkdir()
         (self.folder / "linux-check.log").write_text("Independent check passed\n", encoding="utf-8")
         for axis in ("standards", "spec"):
-            self.evidence["axes"][axis] = dict(tool_use_id=axis, agent_id=axis, completed=True,
+            self.evidence["axes"][axis] = dict(tool_use_id=axis, agent_id=axis, completed=True, call_event=3, call_message_id="review-batch", session_id="session", run_in_background=False,
                 models=["claude-opus-5-5"], status="PASS", summary="Independent report", findings=[],
                 report=f"{axis}-child.json", raw_report=f"{axis}-child.txt",
                 transcript=f"{axis}-transcript.jsonl")
             for suffix in ("json", "txt"):
                 (self.folder / f"{axis}-child.{suffix}").write_text("{}", encoding="utf-8")
             (self.folder / f"{axis}-transcript.jsonl").write_text("{}\n", encoding="utf-8")
+        (self.folder / "stream.jsonl").write_text("Synthetic parent stream fixture\n")
         self.save_receipt()
         self.pr_state = "OPEN"
         self.issue_state = "OPEN"
@@ -140,12 +139,12 @@ class FinishDeliveryTests(unittest.TestCase):
             return self.real_output(command, **kwargs)
         args = command[1:]
         if args[:2] == ["issue", "view"]:
-            value = {**copy.deepcopy(self.spec), "state": self.issue_state}
+            value = {**copy.deepcopy(self.spec), "state": self.issue_state, "number": int(args[2])}
             if int(args[2]) == self.request["issue"]:
                 value["comments"] = [] if self.hide_comments or self.omit_comment_in_issue_view else copy.deepcopy(self.comments)
             return json.dumps(value)
         if args[:2] == ["pr", "view"]:
-            return json.dumps(dict(headRefOid=self.pr_head, baseRefName=self.target_branch,
+            return json.dumps(dict(headRefOid=self.pr_head, headRefName=f"chore/issue-{self.request['issue']}-delivery", title=self.spec["title"], baseRefName=self.target_branch,
                 state=self.pr_state, mergeCommit={"oid": self.merge_sha} if self.pr_state == "MERGED" else None,
                 isDraft=self.draft, mergeable=self.mergeable, statusCheckRollup=self.checks))
         if args[0] == "api":
@@ -154,7 +153,7 @@ class FinishDeliveryTests(unittest.TestCase):
             if route == prefix:
                 return json.dumps(dict(allow_squash_merge=True))
             if route == f"{prefix}/pulls/{self.request['pr']}":
-                return json.dumps(dict(head=dict(sha=self.pr_head), base=dict(sha=self.pr_base, ref=self.target_branch)))
+                return json.dumps(dict(title=self.spec["title"], head=dict(sha=self.pr_head, ref=f"chore/issue-{self.request['issue']}-delivery"), base=dict(sha=self.pr_base, ref=self.target_branch)))
             if route == f"{prefix}/git/ref/heads/{self.target_branch}":
                 return json.dumps(dict(object=dict(sha=self.live_base)))
             if route == f"{prefix}/commits/{self.head}":

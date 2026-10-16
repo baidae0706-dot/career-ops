@@ -1,0 +1,2 @@
+# Fork-owned delivery tooling; preserved by the official updater.
+scripts/delivery/

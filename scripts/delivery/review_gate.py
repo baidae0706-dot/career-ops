@@ -49,6 +49,17 @@ def review_context_digest(request, evidence):
     return digest(dict(request=review_contract(request), **specifications))
 
 
+def validate_title(title):
+    if (not isinstance(title, str) or title != title.strip()
+            or not re.fullmatch(r"[a-z]+\([a-z0-9-]+\): \S[^\r\n]*", title)):
+        raise ValueError("Issue and PR titles must name a clear type(scope): outcome")
+
+
+def validate_branch(branch, issue):
+    if not isinstance(branch, str) or not re.fullmatch(rf"[a-z]+/issue-{issue}-[a-z0-9]+(?:-[a-z0-9]+)*", branch):
+        raise ValueError("Branch must use type/issue-N-clear-description for this Issue")
+
+
 def validate_request(request, config):
     model = review_model(request)
     if request.get("expected_model") != config.get("actual_models", {}).get(model) or not request.get("expected_model"):
@@ -164,6 +175,14 @@ def gate(request, report, evidence):
     skill = evidence.get("skill", {})
     if skill.get("name") != request.get("review_skill") or skill.get("loaded") is not True:
         problems.append("Review skill did not actually load")
+    skill_order = (skill.get("mechanism") == "Skill" and bool(skill.get("tool_use_id"))
+                   and skill.get("session_id") == evidence.get("session_id")
+                   and skill.get("args") == request["base_sha"]
+                   and isinstance(skill.get("call_message_id"), str) and bool(skill["call_message_id"])
+                   and type(skill.get("call_event")) is int and type(skill.get("result_event")) is int
+                   and 0 <= skill["call_event"] < skill["result_event"])
+    if not skill_order or "stream.jsonl" not in evidence.get("files", {}):
+        problems.append("Successful parent Skill invocation is not bound to this run and base")
     models = evidence.get("parent_models", [])
     if not models_match(models, expected_model):
         problems.append(f"Main model is not verified {expected_model}")
@@ -173,7 +192,7 @@ def gate(request, report, evidence):
     if len(submodels) < 2 or any(not models_match(ms, expected_model) for ms in submodels.values()):
         problems.append(f"Two actual {expected_model} subagent transcripts required")
     axes = evidence.get("axes", {})
-    agent_ids, call_ids = set(), set()
+    agent_ids, call_ids, call_messages = set(), set(), set()
     for axis in ("standards", "spec"):
         value = axes.get(axis, {})
         if (not value.get("completed") or value.get("status") != "PASS" or not value.get("summary")
@@ -184,8 +203,17 @@ def gate(request, report, evidence):
                 or not isinstance(value.get("findings"), list)
                 or any(not isinstance(f, dict) or f.get("blocking", True) for f in value.get("findings", []))):
             problems.append(f"Completed passing {axis} child report not verified")
+        if (not skill_order or value.get("session_id") != evidence.get("session_id")
+                or value.get("run_in_background") is not False
+                or type(value.get("call_event")) is not int or value["call_event"] <= skill["result_event"]
+                or not isinstance(value.get("call_message_id"), str) or not value.get("call_message_id")
+                or value.get("call_message_id") == skill.get("call_message_id")):
+            problems.append(f"{axis} must start in the parent after successful Skill loading")
+        call_messages.add(value.get("call_message_id"))
         agent_ids.add(value.get("agent_id"))
         call_ids.add(value.get("tool_use_id"))
+    if None in call_messages or len(call_messages) != 1:
+        problems.append("Both foreground axes must share one assistant tool-call batch")
     if None in agent_ids or len(agent_ids) != 2 or None in call_ids or len(call_ids) != 2:
         problems.append("Review axes are not bound to distinct actual children")
     for axis in ("standards", "spec"):
