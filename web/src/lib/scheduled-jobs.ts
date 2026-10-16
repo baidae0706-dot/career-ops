@@ -9,6 +9,7 @@ import {
 import { nextScheduledRun } from "./scheduled-cadence.mjs";
 import { assertScheduledJobBody } from "./scheduled-job-input.mjs";
 import { scheduledStorePath } from "./scheduled-runner-path.mjs";
+import { scheduledSinceDays } from "./scheduled-recency.mjs";
 
 export type JobStatus = "active" | "paused" | "deleted";
 export type ScanEngine = "full" | "portals";
@@ -104,10 +105,9 @@ export function parseScheduledJobInput(raw: unknown, base?: ScheduledJob): JobFi
     .trim()
     .slice(0, 80) || "UTC");
   const startAt = cleanStartAt(input.startAt, base?.startAt || new Date().toISOString());
-  const filters = parseExplorePatch(
-    (input.filters && typeof input.filters === "object" ? input.filters : {}) as Record<string, unknown>,
-    base?.filters || DEFAULT_FILTERS,
-  );
+  const rawFilters = (input.filters && typeof input.filters === "object" ? input.filters : {}) as Record<string, unknown>;
+  const filters = parseExplorePatch(rawFilters, base?.filters || DEFAULT_FILTERS);
+  filters.sinceDays = scheduledSinceDays(engine, rawFilters, filters.sinceDays);
 
   return { name, engine, unit, every, timezone, startAt, filters };
 }
