@@ -113,7 +113,7 @@ export function buildScanCommand(job) {
   if (job.engine === "portals") {
     return {
       script: "scan.mjs",
-      args: ["--since", String(sinceDays), "--quiet"],
+      args: filters.sinceDays === 0 ? ["--quiet"] : ["--since", String(sinceDays), "--quiet"],
     };
   }
 
@@ -169,6 +169,10 @@ function writeJobPortals(root, job) {
     block_hard: Array.isArray(filters.blockHard) ? filters.blockHard : [],
     always_allow: Array.isArray(filters.alwaysAllow) ? filters.alwaysAllow : [],
   };
+
+  if (job.engine === "portals" && filters.sinceDays === 0) {
+    delete base.max_posting_age_days;
+  }
 
   const tempDir = path.join(root, "data", "tmp");
   fs.mkdirSync(tempDir, { recursive: true });

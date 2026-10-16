@@ -105,10 +105,12 @@ export function FilterBuilder({
   filters,
   onChange,
   seededFrom = [],
+  allowAllDates = false,
 }: {
   filters: ExploreFilters;
   onChange: (f: ExploreFilters) => void;
   seededFrom?: string[];
+  allowAllDates?: boolean;
 }) {
   const [advanced, setAdvanced] = useState(false);
   const set = (patch: Partial<ExploreFilters>) => onChange({ ...filters, ...patch });
@@ -158,7 +160,7 @@ export function FilterBuilder({
             </span>
           </Label>
           <div className="inline-flex rounded-lg border border-border bg-surface/40 p-0.5">
-            {RECENCY.map((r) => (
+            {(allowAllDates ? [{ label: "All dates", days: 0 }, ...RECENCY] : RECENCY).map((r) => (
               <button
                 key={r.days}
                 type="button"

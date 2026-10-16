@@ -117,7 +117,11 @@ export function EditJobModal({
               <label className="mb-1 block text-[13px] font-medium text-foreground">Scan Engine</label>
               <select
                 value={engine}
-                onChange={(e) => setEngine(e.target.value as ScanEngine)}
+                onChange={(e) => {
+                  const nextEngine = e.target.value as ScanEngine;
+                  setEngine(nextEngine);
+                  if (nextEngine === "full") setFilters((value) => ({ ...value, sinceDays: value.sinceDays || 7 }));
+                }}
                 className="w-full rounded-xl border border-border bg-surface-hover/60 px-3.5 py-2 text-sm text-foreground outline-none focus:border-brand/60"
               >
                 <option value="full">Full ATS Dataset Sweep</option>
@@ -154,7 +158,7 @@ export function EditJobModal({
 
           {/* ─── Reuse FilterBuilder from Explore ─── */}
           <div className="rounded-xl border border-border bg-surface/30 p-4">
-            <FilterBuilder filters={filters} onChange={setFilters} />
+            <FilterBuilder filters={filters} onChange={setFilters} allowAllDates={engine === "portals"} />
           </div>
 
           {/* ─── Actions ─── */}
