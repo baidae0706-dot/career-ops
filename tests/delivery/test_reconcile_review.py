@@ -154,6 +154,84 @@ class ReconcileReviewTests(unittest.TestCase):
                 self.assertIn("holds", self.call()["reason"])
         self.assertFalse((self.folder / "reconciliation.json").exists())
 
+    def test_preexisting_unrelated_process_does_not_require_descriptor_access(self):
+        process = self.add_process(900002, start="99")
+        descriptor = process / "fd/0"
+        descriptor.touch()
+        original_stat = Path.stat
+
+        def denied_descriptor(path, *args, **kwargs):
+            if path == descriptor:
+                raise PermissionError(13, "Permission denied", str(path))
+            return original_stat(path, *args, **kwargs)
+
+        with patch.object(Path, "stat", new=denied_descriptor):
+            result = self.call()
+        self.assertEqual(result["reconciliation"], "sealed", result)
+        self.assertEqual(result["verdict"], "INSUFFICIENT")
+        proof = read(self.folder / "reconciliation.json")["process_evidence"]
+        self.assertEqual(proof["excluded_preexisting_processes"], [dict(pid=900002, start_ticks="99")])
+
+    def test_same_later_or_unknown_birth_with_unreadable_descriptors_stays_pending(self):
+        process = self.add_process(900002)
+        descriptor = process / "fd/0"
+        descriptor.touch()
+        original_stat = Path.stat
+
+        def denied_descriptor(path, *args, **kwargs):
+            if path == descriptor:
+                raise PermissionError(13, "Permission denied", str(path))
+            return original_stat(path, *args, **kwargs)
+
+        before = {p.name: p.read_bytes() for p in self.folder.iterdir()}
+        for start in ("100", "101", "unknown", ""):
+            with self.subTest(start=start):
+                (process / "stat").write_text(stat_text(900002, start=start), encoding="utf-8")
+                with patch.object(Path, "stat", new=denied_descriptor):
+                    self.assertEqual(self.call()["reconciliation"], "pending")
+        self.assertEqual({p.name: p.read_bytes() for p in self.folder.iterdir()}, before)
+
+    def test_preexisting_process_with_original_tree_relation_stays_pending(self):
+        process = self.add_process(900002, start="99")
+        for relation in ("parent", "group", "session"):
+            with self.subTest(relation=relation):
+                (process / "stat").write_text(
+                    stat_text(900002, start="99", **{relation: self.status["pid"]}), encoding="utf-8")
+                self.assertIn("original worker/model tree", self.call()["reason"])
+        self.assertFalse((self.folder / "reconciliation.json").exists())
+
+    def test_unreadable_descriptor_directory_remains_pending_for_possible_child(self):
+        process = self.add_process(900002, start="101")
+        original_iterdir = Path.iterdir
+
+        def denied_directory(path):
+            if path == process / "fd":
+                raise PermissionError(13, "Permission denied", str(path))
+            return original_iterdir(path)
+
+        with patch.object(Path, "iterdir", new=denied_directory):
+            self.assertEqual(self.call()["reconciliation"], "pending")
+            (process / "stat").write_text(stat_text(900002, start="99"), encoding="utf-8")
+            self.assertEqual(self.call()["reconciliation"], "sealed")
+
+    def test_reboot_proves_original_tree_ended_without_reading_new_boot_descriptors(self):
+        (self.proc / "sys/kernel/random/boot_id").write_text(NEW_BOOT, encoding="utf-8")
+        process = self.add_process(900002, start="1", group=self.status["pid"])
+        original_iterdir = Path.iterdir
+
+        def denied_directory(path):
+            if path == process / "fd":
+                raise PermissionError(13, "Permission denied", str(path))
+            return original_iterdir(path)
+
+        with patch.object(Path, "iterdir", new=denied_directory):
+            result = self.call()
+        self.assertEqual(result["reconciliation"], "sealed", result)
+        self.assertEqual(result["verdict"], "INSUFFICIENT")
+        proof = read(self.folder / "reconciliation.json")["process_evidence"]
+        self.assertEqual(proof["descriptor_scan"], "not_required_previous_boot_ended")
+        self.assertEqual(proof["processes"]["model"]["start_outcome"], "unknown")
+
     def test_changed_manifest_request_or_lock_cannot_be_recovered(self):
         (self.incoming / "local-evidence.json").write_text("{}", encoding="utf-8")
         self.assertIn("changed", self.call()["reason"])

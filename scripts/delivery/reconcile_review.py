@@ -59,7 +59,7 @@ def process_evidence(status, folder, incoming, proc_root=Path("/proc"), uid=None
         raise Unverified("Original boot or worker-user identity is unverified")
     boot_changed = boot != previous_boot
     proof = dict(boot_id=boot, previous_boot_id=previous_boot, boot_changed=boot_changed,
-                 worker_uid=uid, processes={}, related_processes=[])
+                 worker_uid=uid, processes={}, related_processes=[], excluded_preexisting_processes=[])
     original_ids = set()
     for role, pid_key, start_key in (("worker", "pid", "pid_start_ticks"),
                                     ("model", "model_pid", "model_start_ticks")):
@@ -84,6 +84,14 @@ def process_evidence(status, folder, incoming, proc_root=Path("/proc"), uid=None
             raise Unverified(f"Original {role} is still active")
         proof["processes"][role] = dict(pid=pid, start_ticks=start, state=observed["state"])
 
+    proof["inherited_lock"] = "exclusive_lock_acquired"
+    proof["model_completion"] = "not_asserted"
+    if boot_changed:
+        # A verified new boot ends every original process, even when the model
+        # PID was never saved. Current-boot descriptors cannot belong to them.
+        proof["descriptor_scan"] = "not_required_previous_boot_ended"
+        return proof
+
     # A model can inherit the lock and log descriptors before its PID is saved.
     # Check only descriptor targets matching this run, without reading contents
     # or inspecting other tasks' arguments/environment.
@@ -104,6 +112,14 @@ def process_evidence(status, folder, incoming, proc_root=Path("/proc"), uid=None
                 continue
             if any(observed[key] in original_ids for key in ("parent", "group", "session")):
                 raise Unverified("A process remains in the original worker/model tree")
+            if not observed["start_ticks"].isdigit():
+                raise Unverified("Observed process birth identity is incomplete")
+            # On the same boot, an unrelated process born before the worker
+            # cannot be its descendant. Equal ticks remain ambiguous.
+            if int(observed["start_ticks"]) < int(status["pid_start_ticks"]):
+                proof["excluded_preexisting_processes"].append(
+                    dict(pid=int(entry.name), start_ticks=observed["start_ticks"]))
+                continue
             for descriptor in (entry / "fd").iterdir():
                 try:
                     details = descriptor.stat()
@@ -113,8 +129,6 @@ def process_evidence(status, folder, incoming, proc_root=Path("/proc"), uid=None
                     raise Unverified("A process still holds this round's model or launcher log")
         except FileNotFoundError:
             continue  # Process exited while its metadata was being sampled.
-    proof["inherited_lock"] = "exclusive_lock_acquired"
-    proof["model_completion"] = "not_asserted"
     return proof
 
 
