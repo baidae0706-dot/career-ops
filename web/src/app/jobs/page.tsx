@@ -20,30 +20,25 @@ export default function JobsHistory() {
     <div className="mx-auto max-w-4xl px-6 py-10">
       <div className="flex items-end justify-between">
         <div>
-          <h1 className="font-display text-2xl tracking-tight text-landing">Workers</h1>
-          <p className="mt-1 text-sm text-muted">
-            AI runs started from this dashboard, kept in this browser. <span className="tabular-nums">{jobs.length}</span> total.
-          </p>
+          <h1 className="font-display text-2xl tracking-tight text-landing">{"任务"}</h1>
+          <p className="mt-1 text-sm text-muted">{"从此面板启动的 AI 任务保存在当前浏览器中。"}<span className="tabular-nums">{jobs.length}</span>{"个任务。"}</p>
         </div>
         {jobs.some((j) => j.status !== "running") && (
           <button
             onClick={clearFinished}
             className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
           >
-            <Trash2 className="size-3.5" /> Clear finished
-          </button>
+            <Trash2 className="size-3.5" />{"清除已完成"}</button>
         )}
       </div>
 
       {jobs.length === 0 ? (
-        <div className="mt-8 rounded-2xl border border-dashed border-border bg-surface/30 px-6 py-12 text-center text-sm text-muted">
-          No workers yet. Hit <span className="text-foreground">Evaluate</span> on an inbox posting to start one.
-          <span className="mt-2 block">
-            Ran an evaluation from your AI CLI? It shows up in{" "}
+        <div className="mt-8 rounded-2xl border border-dashed border-border bg-surface/30 px-6 py-12 text-center text-sm text-muted">{"暂无任务。点击待评估职位上的"}<span className="text-foreground">{"评估"}</span>{"即可启动一个任务。"}<span className="mt-2 block">
+            通过 AI CLI 运行的评估可在{" "}
             <Link href="/pipeline?tab=ALL" className="text-foreground underline-offset-2 hover:underline">
-              Pipeline
+              求职进展
             </Link>
-            , not here.
+            中查看。
           </span>
         </div>
       ) : (

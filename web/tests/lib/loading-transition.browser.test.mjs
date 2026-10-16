@@ -24,14 +24,19 @@ test("loading transitions keep context and only latest requests settle Today", {
   for (const name of ["Fixture Alpha", "Fixture Beta", "Fixture Gamma"]) assert.ok(initial.includes(name));
 
   const { chromium } = await import("playwright-core");
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const browser = await chromium.launch({ channel: process.env.CAREER_OPS_TEST_BROWSER_CHANNEL || "chrome", headless: true });
   t.after(() => browser.close());
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await page.context().route("**/api/logo?**", (route) => route.fulfill({ status: 204 }));
+  await page.context().route("**/api/usage", (route) => route.fulfill({ json: {} }));
+  await page.context().route("**/api/version", (route) => route.fulfill({ json: { version: "fixture" } }));
+  await page.addInitScript(() => localStorage.setItem("career-ops:config", JSON.stringify({ ...JSON.parse(localStorage.getItem("career-ops:config") || "{}"), logos: false })));
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  const tab = (label) => page.getByRole("button", { name: new RegExp(`^${label} \\d+$`) });
+  const tabLabels = { ALL: "全部", APPLIED: "已申请" };
+  const tab = (label) => page.getByRole("button", { name: new RegExp(`^${tabLabels[label] ?? label} \\d+$`) });
   const heading = page.getByRole("heading", { level: 1 });
-  const updatesAlert = page.getByRole("alert").filter({ hasText: "could not be loaded." });
+  const updatesAlert = page.getByRole("alert").filter({ hasText: "无法加载。" });
   async function until(check) {
     const started = Date.now();
     while (!await check()) {
@@ -50,7 +55,7 @@ test("loading transitions keep context and only latest requests settle Today", {
   // Check the server, not just the local marker: a misconfigured test URL
   // must never direct fixture mutations at a personal tracker.
   await page.goto(`${origin.origin}/pipeline?tab=ALL`);
-  await page.getByRole("button", { name: /^Edit status/ }).first().waitFor();
+  await page.getByRole("button", { name: /^编辑状态/ }).first().waitFor();
   assert.equal(await page.locator("tbody tr").count(), 3);
   for (const [n, company] of [["11", "Fixture Alpha"], ["12", "Fixture Beta"], ["13", "Fixture Gamma"]]) {
     const row = page.locator("tbody tr").filter({ has: page.getByRole("link", { name: `#${n}`, exact: true }) });
@@ -64,7 +69,7 @@ test("loading transitions keep context and only latest requests settle Today", {
 
   await t.test("Pipeline filter keeps heading, search, tabs and result skeletons", async (subtest) => {
     await page.goto(`${origin.origin}/pipeline?tab=ALL`);
-    await page.getByRole("button", { name: /^Edit status/ }).first().waitFor();
+    await page.getByRole("button", { name: /^编辑状态/ }).first().waitFor();
     const pending = gate();
     let held = false;
     subtest.after(async () => { pending.release(); await page.unrouteAll({ behavior: "wait" }); });
@@ -74,8 +79,8 @@ test("loading transitions keep context and only latest requests settle Today", {
     });
     await tab("APPLIED").click();
     await until(() => held);
-    assert.equal(await heading.innerText(), "Pipeline");
-    assert.equal(await page.getByPlaceholder("Search company or role…").isVisible(), true);
+    assert.equal(await heading.innerText(), "求职进展");
+    assert.equal(await page.getByPlaceholder("搜索公司或岗位…").isVisible(), true);
     assert.equal(await tab("ALL").isVisible(), true);
     assert.equal(await page.locator('tbody[aria-busy="true"]').count(), 1);
     assert.ok(await page.locator('tbody[aria-busy="true"] tr').count() > 0);
@@ -83,7 +88,7 @@ test("loading transitions keep context and only latest requests settle Today", {
     pending.release();
     await page.waitForURL(/tab=APPLIED/);
     await page.locator('tbody[aria-busy="false"]').waitFor();
-    assert.equal(await page.getByRole("button", { name: /^Edit status/ }).count(), 3);
+    assert.equal(await page.getByRole("button", { name: /^编辑状态/ }).count(), 3);
   });
 
   await t.test("Follow-ups query transition retains page context", async (subtest) => {
@@ -96,10 +101,10 @@ test("loading transitions keep context and only latest requests settle Today", {
       if (route.request().headers().rsc === "1") { held = true; await pending.promise; }
       await route.continue();
     });
-    await page.getByRole("button", { name: /^Company/ }).click();
+    await page.getByRole("button", { name: /^公司/ }).click();
     await until(() => held);
-    assert.equal(await heading.innerText(), "Follow-up Tracker");
-    assert.equal(await page.getByPlaceholder("Search company or role…").isVisible(), true);
+    assert.equal(await heading.innerText(), "跟进记录");
+    assert.equal(await page.getByPlaceholder("搜索公司或岗位…").isVisible(), true);
     assert.equal(await tab("ALL").isVisible(), true);
     assert.equal(await page.locator('tbody[aria-busy="true"]').count(), 1);
     assert.ok(await page.locator('tbody[aria-busy="true"] tr').count() > 0);
@@ -123,18 +128,18 @@ test("loading transitions keep context and only latest requests settle Today", {
       await route.fulfill({ json: endpoint === "/api/followups" ? emptyFollowups : emptyFresh });
     });
     await page.goto(origin.origin);
-    await page.getByRole("button", { name: "Retry updates" }).waitFor();
-    assert.equal(await heading.innerText(), "Some updates are unavailable.");
+    await page.getByRole("button", { name: "重试更新" }).waitFor();
+    assert.equal(await heading.innerText(), "部分更新暂不可用。");
     assert.equal(await updatesAlert.isVisible(), true);
-    assert.equal(await page.getByText("You're all caught up.", { exact: true }).count(), 0);
+    assert.equal(await page.getByText("已查看全部新结果。", { exact: true }).count(), 0);
     retry = true;
     seen.clear();
-    await page.getByRole("button", { name: "Retry updates" }).click();
+    await page.getByRole("button", { name: "重试更新" }).click();
     await until(() => seen.size === 2);
-    assert.equal(await heading.innerText(), "Your career queue is loading.");
-    await page.getByRole("region", { name: "Loading follow-ups due" }).waitFor();
+    assert.equal(await heading.innerText(), "正在加载你的求职待办。");
+    await page.getByRole("region", { name: "正在加载到期跟进" }).waitFor();
     pending.release();
-    await page.getByRole("heading", { name: "You're all caught up." }).waitFor();
+    await page.getByRole("heading", { name: "已查看全部新结果。" }).waitFor();
     assert.equal(await updatesAlert.count(), 0);
   });
 
@@ -146,10 +151,10 @@ test("loading transitions keep context and only latest requests settle Today", {
         : emptyFresh,
     }));
     await page.goto(origin.origin);
-    await page.getByRole("button", { name: "Retry updates" }).waitFor();
-    assert.equal(await heading.innerText(), "Some updates are unavailable.");
-    assert.match(await updatesAlert.innerText(), /Follow-ups could not be loaded/);
-    assert.equal(await page.getByText("You're all caught up.", { exact: true }).count(), 0);
+    await page.getByRole("button", { name: "重试更新" }).waitFor();
+    assert.equal(await heading.innerText(), "部分更新暂不可用。");
+    assert.match(await updatesAlert.innerText(), /跟进无法加载/);
+    assert.equal(await page.getByText("已查看全部新结果。", { exact: true }).count(), 0);
   });
 
   await t.test("older success cannot end a newer load; older failure cannot replace newer success", async (subtest) => {
@@ -176,26 +181,26 @@ test("loading transitions keep context and only latest requests settle Today", {
     await page.reload();
     await started(1);
     release(1);
-    await page.getByRole("heading", { name: "You're all caught up." }).waitFor();
+    await page.getByRole("heading", { name: "已查看全部新结果。" }).waitFor();
     await refetch(); await started(2);
     await refetch(); await started(3);
     release(2);
     await until(() => completed === 4);
     await page.waitForTimeout(100);
-    assert.equal(await heading.innerText(), "Your career queue is loading.");
+    assert.equal(await heading.innerText(), "正在加载你的求职待办。");
     gates.get("3:/api/whats-new").release();
     await until(() => completed === 5);
-    assert.equal(await heading.innerText(), "Your career queue is loading.");
+    assert.equal(await heading.innerText(), "正在加载你的求职待办。");
     gates.get("3:/api/followups").release();
-    await page.getByRole("heading", { name: "You're all caught up." }).waitFor();
+    await page.getByRole("heading", { name: "已查看全部新结果。" }).waitFor();
     await refetch(); await started(4);
     await refetch(); await started(5);
     release(5);
-    await page.getByRole("heading", { name: "You're all caught up." }).waitFor();
+    await page.getByRole("heading", { name: "已查看全部新结果。" }).waitFor();
     release(4);
     await until(() => completed === 10);
     await page.waitForTimeout(100);
-    assert.equal(await heading.innerText(), "You're all caught up.");
+    assert.equal(await heading.innerText(), "已查看全部新结果。");
     assert.equal(await updatesAlert.count(), 0);
   });
 

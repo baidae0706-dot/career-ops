@@ -51,14 +51,14 @@ export function NextDateDialog({
       });
       const j = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setError(typeof j.error === "string" ? j.error : "Could not update the pin.");
+        setError(typeof j.error === "string" ? j.error : "无法更新固定日期。");
         setBusy(null);
         return;
       }
       onChanged();
       onClose();
     } catch {
-      setError("Could not update the pin.");
+      setError("无法更新固定日期。");
       setBusy(null);
     }
   };
@@ -76,17 +76,17 @@ export function NextDateDialog({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={`Pin next follow-up date for ${entry.company}`}
+        aria-label={`固定下次跟进日期：${entry.company}`}
         className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-xl"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="font-display text-lg">Pin next follow-up</h2>
+            <h2 className="font-display text-lg">{"固定下次跟进"}</h2>
             <p className="mt-0.5 text-sm text-muted">
               {entry.company} · {entry.role} <span className="text-faint">(#{entry.num})</span>
             </p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded p-1 text-faint transition hover:text-foreground">
+          <button type="button" onClick={onClose} aria-label="关闭" className="rounded p-1 text-faint transition hover:text-foreground">
             <X className="size-4" />
           </button>
         </div>
@@ -98,9 +98,7 @@ export function NextDateDialog({
           }}
           className="mt-4 space-y-3"
         >
-          <label className="block text-xs font-medium text-muted">
-            Next follow-up date
-            <input type="date" required value={date} min={today} onChange={(e) => setDate(e.target.value)} className={cn(inputCls, "mt-1")} />
+          <label className="block text-xs font-medium text-muted">{"下次跟进日期"}<input type="date" required value={date} min={today} onChange={(e) => setDate(e.target.value)} className={cn(inputCls, "mt-1")} />
           </label>
           <div className="flex gap-2">
             {[3, 7, 14].map((n) => (
@@ -113,13 +111,10 @@ export function NextDateDialog({
                   date === plusDays(n) && "border-brand/50 bg-brand-soft text-brand",
                 )}
               >
-                +{n} days
-              </button>
+                +{n}{"天"}</button>
             ))}
           </div>
-          <p className="text-xs leading-relaxed text-faint">
-            Overrides the computed schedule until you log a follow-up, which resumes the normal cadence.
-          </p>
+          <p className="text-xs leading-relaxed text-faint">{"在你记录一次跟进之前，此日期会覆盖自动计算的安排；记录跟进后恢复常规频率。"}</p>
           {error && <p className="text-xs text-red-500">{error}</p>}
           <div className="flex items-center justify-end gap-2 pt-1">
             {entry.nextOverride && (
@@ -128,21 +123,17 @@ export function NextDateDialog({
                 disabled={busy !== null}
                 onClick={() => void call("DELETE", { appNum: entry.num }, "clear")}
                 className="mr-auto inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-xs font-medium text-muted transition-colors hover:text-red-500 disabled:pointer-events-none disabled:opacity-60"
-                title={`Currently pinned to ${entry.nextOverride}`}
+                title={`当前固定为 ${entry.nextOverride}`}
               >
-                {busy === "clear" ? <Loader2 className="size-3.5 animate-spin" /> : <PinOff className="size-3.5" />} Clear pin
-              </button>
+                {busy === "clear" ? <Loader2 className="size-3.5 animate-spin" /> : <PinOff className="size-3.5" />}{"清除固定日期"}</button>
             )}
-            <button type="button" onClick={onClose} className="rounded-md px-3 py-2 text-sm text-muted transition hover:text-foreground">
-              Cancel
-            </button>
+            <button type="button" onClick={onClose} className="rounded-md px-3 py-2 text-sm text-muted transition hover:text-foreground">{"取消"}</button>
             <button
               type="submit"
               disabled={busy !== null}
               className="inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-2 text-sm font-medium text-brand-foreground transition-colors hover:bg-brand-200 disabled:pointer-events-none disabled:opacity-60"
             >
-              {busy === "set" ? <Loader2 className="size-3.5 animate-spin" /> : <Pin className="size-3.5" />} Pin date
-            </button>
+              {busy === "set" ? <Loader2 className="size-3.5 animate-spin" /> : <Pin className="size-3.5" />}{"固定日期"}</button>
           </div>
         </form>
       </div>

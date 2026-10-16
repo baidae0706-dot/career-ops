@@ -53,10 +53,8 @@ export function CvEditor() {
     <div className="mx-auto max-w-6xl px-6 py-8">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl tracking-tight text-landing">CV editor</h1>
-          <p className="mt-1 text-sm text-muted">
-            Edit <code className="text-foreground">cv.md</code> with live preview.
-            {!exists && loaded && <span className="ml-1 text-faint">No cv.md yet — start typing to create it.</span>}
+          <h1 className="font-display text-2xl tracking-tight text-landing">{"简历编辑器"}</h1>
+          <p className="mt-1 text-sm text-muted">{"编辑"}<code className="text-foreground">cv.md</code>{"，右侧实时预览。"}{!exists && loaded && <span className="ml-1 text-faint">{"尚无 cv.md，输入内容即可创建。"}</span>}
           </p>
         </div>
         <button
@@ -71,12 +69,12 @@ export function CvEditor() {
           )}
         >
           {saving ? <Loader2 className="size-4 animate-spin" /> : saved ? <Check className="size-4" /> : null}
-          {saved ? "Saved" : "Save"}
+          {saved ? "已保存" : "保存"}
         </button>
       </div>
 
       {!loaded ? (
-        <div className="mt-6 text-sm text-muted">Loading…</div>
+        <div className="mt-6 text-sm text-muted">{"加载中…"}</div>
       ) : (
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
           <textarea
@@ -86,14 +84,14 @@ export function CvEditor() {
               setDirty(true);
             }}
             spellCheck={false}
-            placeholder="# Your Name&#10;&#10;## Summary&#10;..."
+            placeholder="# 你的姓名&#10;&#10;## 个人简介&#10;..."
             className="min-h-[60vh] w-full resize-none rounded-2xl border border-border bg-surface/50 p-4 font-mono text-sm leading-relaxed outline-none transition-colors placeholder:text-faint focus:border-brand/40"
           />
           <article className="report-prose min-h-[60vh] overflow-auto rounded-2xl border border-border bg-surface/30 p-5">
             {content.trim() ? (
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
             ) : (
-              <p className="text-muted">Preview appears here.</p>
+              <p className="text-muted">{"预览将在这里显示。"}</p>
             )}
           </article>
         </div>

@@ -36,11 +36,10 @@ export function ApplyButton({
       <button
         type="button"
         disabled
-        title={!hasUrl ? "No application URL on this report" : "Generate the tailored CV (PDF) first to apply"}
+        title={!hasUrl ? "此报告没有申请链接" : "请先生成定制简历 PDF，再申请"}
         className="inline-flex cursor-not-allowed items-center justify-center gap-1.5 rounded-full border border-border bg-surface/40 px-3.5 py-1 text-xs font-medium text-faint max-sm:min-h-[44px]"
       >
-        <Lock className="size-3.5" /> Apply
-      </button>
+        <Lock className="size-3.5" />{"申请"}</button>
     );
   }
   return (
@@ -63,11 +62,10 @@ export function ApplyButton({
       }
       title={
         quiet
-          ? "Apply — below the apply line or caution; opens the form pre-filled, you review and submit yourself"
-          : "Apply — opens the form pre-filled, you review and submit yourself"
+          ? "申请：低于推荐线或有风险提示；将打开预填表单，由你审核并亲自提交"
+          : "申请：打开预填表单，由你审核并亲自提交"
       }
     >
-      <Send className="size-3.5" /> Apply
-    </button>
+      <Send className="size-3.5" />{"申请"}</button>
   );
 }

@@ -22,18 +22,13 @@ export default function PortalsPage() {
     <div className="mx-auto max-w-3xl px-6 py-8">
       <div className="flex items-center gap-3">
         <Radar className="size-6 text-brand" />
-        <h1 className="font-display text-2xl tracking-tight text-landing">Portals</h1>
+        <h1 className="font-display text-2xl tracking-tight text-landing">{"招聘门户"}</h1>
       </div>
-      <p className="mt-1.5 max-w-xl text-sm text-muted">
-        The companies career-ops watches for new roles. Run a health check to catch company boards that have quietly
-        broken — a broken link means that company silently disappears from every future scan.
-      </p>
-      <p className="mt-1.5 text-xs text-faint">
-        Backed by <code className="text-muted">portals.yml</code> — edit it directly or ask the assistant.
-      </p>
+      <p className="mt-1.5 max-w-xl text-sm text-muted">{"career-ops 关注这些公司的新职位。运行健康检查可发现失效的招聘网站；链接损坏会导致该公司在后续扫描中被跳过。"}</p>
+      <p className="mt-1.5 text-xs text-faint">{"配置文件："}<code className="text-muted">portals.yml</code>{"，可直接编辑，也可让助手修改。"}</p>
       {error && (
         <p role="alert" className="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-600 dark:text-rose-400">
-          Could not read <code>portals.yml</code>: {error}
+          无法读取 <code>portals.yml</code>: {error}
         </p>
       )}
       <div className="mt-6">

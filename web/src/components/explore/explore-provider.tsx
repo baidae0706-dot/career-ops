@@ -168,7 +168,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
     setPartial(false);
     setError("");
     setScannerMissing(false);
-    setStatus("Casting the net across the ATS network…");
+    setStatus("正在扫描 ATS 网络…");
     const init: Partial<Record<AtsSource, SourceState>> = {};
     for (const a of f.ats) init[a] = { state: "queued" };
     setSources(init);
@@ -197,9 +197,9 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
         sawScannerMissing = isScannerMissing(d);
-        sawError = d.error || (sawScannerMissing ? "The scanner isn't available." : `Discovery failed (${r.status}).`);
+        sawError = d.error || (sawScannerMissing ? "扫描器不可用。" : `职位探索失败（${r.status}).`);
       } else if (!r.body) {
-        sawError = "No response stream.";
+        sawError = "没有响应数据流。";
       } else {
         const reader = r.body.getReader();
         const dec = new TextDecoder();
@@ -222,7 +222,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
             switch (ev.kind) {
               case "atsStart":
                 setPhase("scanning");
-                setStatus(`Walking ${ATS_LABEL[ev.ats as AtsSource] ?? ev.ats} — ${ev.companies.toLocaleString()} companies`);
+                setStatus(`正在遍历 ${ATS_LABEL[ev.ats as AtsSource] ?? ev.ats} — ${ev.companies.toLocaleString()} 家公司`);
                 setSources((s) => ({ ...s, [ev.ats]: { ...s[ev.ats as AtsSource], state: "active", companies: ev.companies } }));
                 break;
               case "progress":
@@ -290,7 +290,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
       }
       setMatchCount(acc.length);
       setPhase("revealing");
-      setStatus(`${acc.length} fresh role${acc.length === 1 ? "" : "s"} found — free.`);
+      setStatus(`免费找到 ${acc.length} 个新职位。`);
       window.setTimeout(() => setPhase("results"), 850);
     } else if (sawError) {
       setError(sawError);
@@ -315,7 +315,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
     if (runningRef.current) return;
     runningRef.current = true;
     setPhase("casting");
-    setStatus("Loading fresh matches…");
+    setStatus("正在加载新匹配…");
     setOffers([]);
     setMatchCount(0);
     setCompaniesScanned(0);
@@ -331,13 +331,13 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
       // complete total, which is what the header actually reports.
       const r = await fetch(`/api/whats-new?limit=${MAX_OFFER_LIMIT}`);
       if (!r.ok) {
-        setError(`Couldn't load fresh matches (${r.status}).`);
+        setError(`无法加载新匹配（${r.status}).`);
         setPhase("failed");
         return;
       }
       const d = await r.json().catch(() => null);
       if (!d || !Array.isArray(d.offers)) {
-        setError("Couldn't load fresh matches — unexpected response.");
+        setError("无法加载新匹配，响应格式异常。");
         setPhase("failed");
         return;
       }
@@ -347,7 +347,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
       setMatchCount(Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : list.length);
       setPhase(list.length > 0 ? "results" : "empty-current");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't load fresh matches.");
+      setError(e instanceof Error ? e.message : "无法加载新匹配。");
       setPhase("failed");
     } finally {
       runningRef.current = false;
@@ -438,7 +438,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
     setAiCost({ searches: 0, candidates: 0, fetches: 0 });
     setError("");
     setScannerMissing(false);
-    setStatus("Casting across the open web…");
+    setStatus("正在搜索公开网络…");
     if (typeof window !== "undefined") window.history.replaceState(null, "", `/explore?${aiToParams(intent)}`);
 
     let knownUrls = new Set<string>();
@@ -492,9 +492,9 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
         sawScannerMissing = isScannerMissing(d);
-        sawError = d.error || (sawScannerMissing ? "AI search isn't available." : `AI search failed (${r.status}).`);
+        sawError = d.error || (sawScannerMissing ? "AI 搜索不可用。" : `AI 搜索失败（${r.status}).`);
       } else if (!r.body) {
-        sawError = "No response stream.";
+        sawError = "没有响应数据流。";
       } else {
         const reader = r.body.getReader();
         const dec = new TextDecoder();
@@ -513,7 +513,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
     if (acc.length > 0) {
       setMatchCount(acc.length);
       setPhase("revealing");
-      setStatus(`${acc.length} candidate${acc.length === 1 ? "" : "s"} found.`);
+      setStatus(`找到 ${acc.length} 个候选职位。`);
       window.setTimeout(() => setPhase("results"), 850);
     } else if (sawError) {
       setError(sawError);

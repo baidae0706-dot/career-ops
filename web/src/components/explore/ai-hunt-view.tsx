@@ -42,18 +42,17 @@ export function AiHuntView({ cliName }: { cliName?: string }) {
 
         <div>
           <h2 className={`${instrumentSerif.className} text-3xl leading-tight text-foreground`}>
-            {matchCount > 0 ? `${shown} candidate${shown === 1 ? "" : "s"}` : "Hunting the open web"}
+            {matchCount > 0 ? `${shown} 个候选职位` : "正在搜索公开网络"}
           </h2>
           <p className="mt-1 text-sm text-muted">
-            {revealing ? "found — review them below" : matchCount > 0 ? "found so far · streaming in" : "casting across the public web…"}
+            {revealing ? "已找到，请在下方查看" : matchCount > 0 ? "已找到，结果持续返回中" : "正在搜索公开网络…"}
           </p>
         </div>
 
         <div className="co-ailedger">
           <Sparkles className="size-3.5" />
-          {cliName || "your CLI"} · searching the open web
-          {aiCost.searches > 0 && <span className="opacity-75">· {aiCost.searches} searches</span>}
-          {matchCount > 0 && <span className="opacity-75">· {matchCount} found</span>}
+          {cliName || "你的 CLI"}{"· 正在搜索公开网络"}{aiCost.searches > 0 && <span className="opacity-75">· {aiCost.searches}{"次搜索"}</span>}
+          {matchCount > 0 && <span className="opacity-75">· {matchCount}{"个结果"}</span>}
         </div>
 
         <AiHuntTrace trace={aiTrace} />

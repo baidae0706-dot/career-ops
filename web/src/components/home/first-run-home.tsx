@@ -20,19 +20,10 @@ export function FirstRunHome() {
         <div aria-hidden className="pointer-events-none absolute inset-0 z-[1] bg-surface/55 backdrop-blur-[2px] dark:bg-background/45" />
         <div className="relative z-10">
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted">
-            <span className="text-faint">//</span> local-first · your machine
-          </p>
-          <h1 className={`${instrumentSerif.className} mt-3 text-4xl leading-[1.05] text-landing md:text-5xl`}>
-            Drop your CV. See who&apos;s hiring you in 60 seconds.
-          </h1>
-          <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted">
-            No account. Paste text or drop a .md / .txt file to start. A PDF needs an AI CLI in{" "}
-            <a href="/config" className="text-foreground underline-offset-2 hover:underline">
-              Config
-            </a>{" "}
-            first. The market scan is <span className="text-foreground">free</span>. You only spend tokens when you
-            choose to score a role.
-          </p>
+            <span className="text-faint">//</span>{"本机优先 · 你的电脑"}</p>
+          <h1 className={`${instrumentSerif.className} mt-3 text-4xl leading-[1.05] text-landing md:text-5xl`}>{"上传简历，60 秒了解谁在招聘。"}</h1>
+          <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-muted">{"无需账户。粘贴文字或上传 .md / .txt 即可开始。读取 PDF 需先在"}{" "}
+            <a href="/config" className="text-foreground underline-offset-2 hover:underline">{"设置"}</a>{" "}{"中连接 AI CLI。市场扫描"}<span className="text-foreground">{"免费"}</span>{"。仅在你选择评估职位时消耗 Token。"}</p>
           <div className="mt-7">
             <CvIngest />
           </div>
