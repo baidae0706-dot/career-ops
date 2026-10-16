@@ -19620,11 +19620,22 @@ try {
   const jdPath = join(geminiTmp, 'mock-jd.txt');
   writeFileSync(jdPath, '\uFEFFJob in Türkiye Čeština with BOM', 'utf-8');
 
+  // This context/encoding check must not depend on Google being reachable.
+  // Stub only the external fetch boundary; the evaluator and SDK still run.
+  const mockFetchPath = join(geminiTmp, 'mock-gemini-fetch.mjs');
+  writeFileSync(mockFetchPath, `globalThis.fetch = async (url) => {
+    if (!String(url).startsWith('https://generativelanguage.googleapis.com/')) {
+      throw new Error('Unexpected request in Gemini context test');
+    }
+    return new Response(JSON.stringify({ error: { code: 400, message: 'API_KEY_INVALID: test key', status: 'INVALID_ARGUMENT' } }),
+      { status: 400, headers: { 'content-type': 'application/json' } });
+  };`, 'utf-8');
+
   // Run ROOT/gemini-eval.mjs directly with cwd: geminiTmp.
   let stdout = '';
   let stderr = '';
   try {
-    stdout = execFileSync(NODE, [join(ROOT, 'gemini-eval.mjs'), '--file', jdPath, '--no-save'], {
+    stdout = execFileSync(NODE, ['--import', pathToFileURL(mockFetchPath).href, join(ROOT, 'gemini-eval.mjs'), '--file', jdPath, '--no-save'], {
       cwd: geminiTmp,
       env: {
         ...process.env,
