@@ -1,10 +1,11 @@
 // Test transport only. The actual scanner and runner still execute as processes.
 import fs from 'node:fs';
-import path from 'node:path';
-if (process.env.SCAN_COMPAT_AUDIT && path.basename(process.argv[1] || '') === 'scan.mjs') {
+import { isMainModule } from '../../lib/is-main-module.mjs';
+const scannerIsMain = isMainModule(new URL('../../scan.mjs', import.meta.url).href);
+if (process.env.SCAN_COMPAT_AUDIT && scannerIsMain) {
   fs.appendFileSync(process.env.SCAN_COMPAT_AUDIT, JSON.stringify({ pid: process.pid, argv: process.argv.slice(1), overlay: fs.readFileSync(process.env.CAREER_OPS_PORTALS, 'utf8') }) + '\n');
 }
-if (path.basename(process.argv[1] || '') === 'scan.mjs') {
+if (scannerIsMain) {
 if (process.env.SCAN_COMPAT_FAIL === '1') throw new Error('Synthetic scanner startup failure');
 let step = 0;
 globalThis.fetch = async (url, init = {}) => {
