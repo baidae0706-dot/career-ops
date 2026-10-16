@@ -84,7 +84,7 @@ export function CvEditor() {
               setDirty(true);
             }}
             spellCheck={false}
-            placeholder="# 你的姓名\n\n## 个人简介\n..."
+            placeholder="# 你的姓名&#10;&#10;## 个人简介&#10;..."
             className="min-h-[60vh] w-full resize-none rounded-2xl border border-border bg-surface/50 p-4 font-mono text-sm leading-relaxed outline-none transition-colors placeholder:text-faint focus:border-brand/40"
           />
           <article className="report-prose min-h-[60vh] overflow-auto rounded-2xl border border-border bg-surface/30 p-5">

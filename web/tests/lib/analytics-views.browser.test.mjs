@@ -39,7 +39,7 @@ test("Analytics rebase retains Progress, 搜索统计 and core Insights", {
       assert.equal(response.status(), 200);
       await page.getByRole("heading", { name: "申请进展", exact: true }).waitFor();
       await page.getByRole("heading", { name: "转化率", exact: true }).waitFor();
-      assert.equal(await nav.getByRole("link", { name: "求职进展", exact: true }).getAttribute("aria-current"), "page");
+      assert.equal(await nav.getByRole("link", { name: "进展总览", exact: true }).getAttribute("aria-current"), "page");
       assert.deepEqual(await nav.getByRole("link").evaluateAll(links => links.map(link => link.getAttribute("href"))),
         ["/analytics", "/analytics?view=insights", "/analytics?view=search-stats"]);
     });
@@ -72,7 +72,7 @@ test("Analytics rebase retains Progress, 搜索统计 and core Insights", {
     await nav.getByRole("link", { name: "搜索统计", exact: true }).click();
     await page.getByRole("heading", { name: "求职策略洞察", exact: true }).waitFor();
     assert.equal(new URL(page.url()).search, "?view=search-stats");
-    await nav.getByRole("link", { name: "求职进展", exact: true }).click();
+    await nav.getByRole("link", { name: "进展总览", exact: true }).click();
     await page.getByRole("heading", { name: "申请进展", exact: true }).waitFor();
     assert.equal(new URL(page.url()).search, "");
     await nav.getByRole("link", { name: "洞察", exact: true }).click();

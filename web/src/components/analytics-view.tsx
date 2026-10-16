@@ -52,7 +52,7 @@ export function AnalyticsShell({ total, view, children }: {
 
       <nav aria-label="分析视图" className="mt-5 -mb-px flex gap-1 overflow-x-auto border-b border-border">
         <AnalyticsTab href="/analytics" active={view === "progress"} icon={<BarChart3 className="size-3.5" />}>
-          求职进展
+          进展总览
         </AnalyticsTab>
         <AnalyticsTab href="/analytics?view=insights" active={view === "insights"} icon={<Sparkles className="size-3.5" />}>
           洞察
