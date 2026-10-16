@@ -1292,21 +1292,21 @@ search_queries:
 #   careers_url: https://careers.tencent.com/search.html  # any https://careers.tencent.com URL
 #   keywords: ["AI", "大模型"]   # each keyword is a separate server-side query, results deduped;
 #                                # omit keywords to pull the whole board
-#   max_pages: 20          # optional per-keyword page cap (100 posts/page, default 20)
+#   max_pages: 100         # optional per-keyword page cap (100 posts/page, default 100)
 #   enabled: true
 #
 # - name: 美团 (Meituan)
 #   careers_url: https://zhaopin.meituan.com/web/social   # any https://zhaopin.meituan.com URL
 #   keywords: ["AI", "大模型"]   # each keyword is a separate server-side query, results deduped;
 #                                # omit keywords to pull the whole board
-#   max_pages: 30          # optional per-keyword page cap (100 posts/page, default 30)
+#   max_pages: 100         # optional per-keyword page cap (100 posts/page, default 100)
 #   enabled: true
 #
 # - name: 阿里巴巴 (Alibaba)
 #   careers_url: https://talent.alibaba.com/off-campus/position-list   # any https://talent.alibaba.com URL
 #   keywords: ["AI", "大模型"]   # each keyword is a separate server-side query, results deduped;
 #                                # omit keywords to pull the whole board
-#   max_pages: 50          # optional per-keyword page cap (100 posts/page, default 50)
+#   max_pages: 100         # optional per-keyword page cap (100 posts/page, default 100)
 #   enabled: true
 #
 # - name: Example Feishu Jobs Co
@@ -1323,6 +1323,10 @@ search_queries:
 #
 # - name: Example Workable Co
 #   careers_url: https://apply.workable.com/exampleco   # any apply.workable.com/<slug> host
+#   enabled: true
+#
+# - name: Example Recruitee Co
+#   careers_url: https://exampleco.recruitee.com         # any *.recruitee.com host
 #   enabled: true
 #
 # - name: Example ADP Workforce Now Co
@@ -2366,6 +2370,11 @@ tracked_companies:
     scan_method: websearch
     scan_query: 'site:jobs.ashbyhq.com/perk'
     notes: "Barcelona. Business travel unicorn (rebranded Perk)."
+    enabled: true
+
+  - name: Channable
+    careers_url: https://channable.recruitee.com
+    notes: "Utrecht. Product feed management for e-commerce. Recruitee board."
     enabled: true
 
   # -- DACH & European AI ecosystem --

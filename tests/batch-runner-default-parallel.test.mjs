@@ -1,14 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, chmodSync, existsSync } from 'node:fs';
 import { join, delimiter } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getBash, rmSync } from './helpers.mjs';
 
 const SRC = readFileSync(new URL('../batch/batch-runner.sh', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
-function runBatch({ offers, args = [] }) {
+function runBatch({ offers, args = [], synchronizeInitialWorkers = false }) {
   const dir = mkdtempSync(join(tmpdir(), 'batch-default-parallel-'));
   try {
     const batchDir = join(dir, 'batch');
@@ -32,27 +32,56 @@ function runBatch({ offers, args = [] }) {
       '#!/usr/bin/env bash',
       'last="${@: -1}"',
       'id=$(printf \'%s\' "$last" | grep -oE \'Batch ID: [0-9]+\' | grep -oE \'[0-9]+\')',
+      'wait_for_initial_starts() {',
+      '  local deadline=$((SECONDS + 20))',
+      '  while [[ ! -f "$FIXTURE_DIR/started-2" || ! -f "$FIXTURE_DIR/started-3" ]]; do',
+      '    if (( SECONDS >= deadline )); then',
+      '      local reason="Fixture barrier timed out: worker $id waiting for initial workers 2 and 3"',
+      '      printf \'%s\\n\' "$reason" > "$FIXTURE_DIR/barrier-timeout.txt"',
+      '      printf \'%s\\n\' "$reason" >&2',
+      '      return 1',
+      '    fi',
+      '    sleep 0.05',
+      '  done',
+      '}',
       'if [[ "$id" == 1 && ! -f "$FIXTURE_DIR/limited" ]]; then',
-      '  sleep 0.5',
+      '  if [[ "$FIXTURE_SYNC_INITIAL_WORKERS" == 1 ]]; then',
+      '    wait_for_initial_starts || exit 99',
+      '  else',
+      '    sleep 0.5',
+      '  fi',
       '  : > "$FIXTURE_DIR/limited"',
       '  echo "Error: 429 Too Many Requests"',
       '  exit 1',
       'fi',
       ': > "$FIXTURE_DIR/live/$id"',
       'echo "start $id live $(ls "$FIXTURE_DIR/live" | wc -l | tr -d " ")" >> "$FIXTURE_DIR/starts.log"',
+      ': > "$FIXTURE_DIR/started-$id"',
+      'if [[ "$FIXTURE_SYNC_INITIAL_WORKERS" == 1 && ( "$id" == 2 || "$id" == 3 ) ]]; then',
+      '  wait_for_initial_starts || exit 99',
+      'fi',
       'sleep 1',
       'rm -f "$FIXTURE_DIR/live/$id"',
       'exit 1',
     ].join('\n') + '\n');
     chmodSync(join(binDir, 'claude'), 0o755);
     chmodSync(join(binDir, 'curl'), 0o755);
-    const stdout = execFileSync(getBash(), [join(batchDir, 'batch-runner.sh'), '--max-retries', '1', '--rate-limit-sleep', '1', ...args], {
-      cwd: dir,
-      env: { ...process.env, PATH: `${binDir}${delimiter}${process.env.PATH}`, FIXTURE_DIR: dir },
-      stdio: ['ignore', 'pipe', 'pipe'],
-      encoding: 'utf8',
-      timeout: 60000,
-    });
+    let stdout;
+    try {
+      stdout = execFileSync(getBash(), [join(batchDir, 'batch-runner.sh'), '--max-retries', '1', '--rate-limit-sleep', '1', ...args], {
+        cwd: dir,
+        env: { ...process.env, PATH: `${binDir}${delimiter}${process.env.PATH}`, FIXTURE_DIR: dir, FIXTURE_SYNC_INITIAL_WORKERS: synchronizeInitialWorkers ? '1' : '0' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        encoding: 'utf8',
+        timeout: 60000,
+      });
+    } catch (error) {
+      const diagnostic = join(dir, 'barrier-timeout.txt');
+      if (existsSync(diagnostic)) error.message += `\n${readFileSync(diagnostic, 'utf8')}`;
+      throw error;
+    }
+    const diagnostic = join(dir, 'barrier-timeout.txt');
+    if (existsSync(diagnostic)) assert.fail(readFileSync(diagnostic, 'utf8'));
     const starts = Object.fromEntries(readFileSync(join(dir, 'starts.log'), 'utf8').trim().split('\n').map((l) => l.split(' ')).map(([, id, , live]) => [id, Number(live)]));
     return { stdout, starts };
   } finally {
@@ -61,7 +90,10 @@ function runBatch({ offers, args = [] }) {
 }
 
 test('claude batches default to 3 workers and drop to 1 after a rate limit', () => {
-  const { stdout, starts } = runBatch({ offers: 6 });
+  // Both initial workers must finish recording their overlap before worker 1
+  // reports 429 or either one exits. Scheduler delays cannot make retry 1
+  // appear in their samples, or let worker 2 finish before worker 3 starts.
+  const { stdout, starts } = runBatch({ offers: 6, synchronizeInitialWorkers: true });
   assert.match(stdout, /Parallel: 3 \|/);
   assert.match(stdout, /Rate limited: running the remaining offers on 1 worker/);
   assert.equal(Math.max(starts['2'], starts['3']), 2, 'offers 2 and 3 ran next to each other');

@@ -430,14 +430,18 @@ export function newCompletedReportNum(beforeEntries, afterEntries) {
 }
 
 // Graceful-SIGTERM budget (ms) for a run, kept safely under the route's 800s
-// maxDuration. pdf reserves headroom for its post-agent render+mark phase; a
-// plain evaluate has no such phase, so it gets nearly the whole budget. The old
+// maxDuration. pdf reserves headroom for its post-agent Chromium render.
+// evaluate reserves 60s for report-persist (write the report, merge the
+// tracker, release the sentinel), which runs after the agent. Other kinds
+// have no post-agent phase, so they keep nearly the whole budget. The old
 // 285s evaluate floor killed real evaluations mid-run — ~25 Bash calls plus web
 // searches routinely run longer — and the kill then misreported as "didn't save
 // a report" (#3124).
 export const RUN_MAX_DURATION_S = 800;
 export function killMsForKind(kind) {
-  return kind === "pdf" ? 600_000 : 780_000;
+  if (kind === "pdf") return 600_000;
+  if (kind === "evaluate") return 740_000;
+  return 780_000;
 }
 
 // Message for a run the route stopped at its own time limit. It names the limit,

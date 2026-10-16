@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from delivery import HERE, read, write, output, run_id, files_index, verify_collection_log, require_cleanup_resolved
+from delivery import require_candidate_ancestry, HERE, read, write, output, run_id, files_index, verify_collection_log, require_cleanup_resolved
 from review_gate import (IDENTITY, digest, gate, validate_request, verify_files, review_model,
                          codex_gate, review_contract, review_context_digest, validate_title, validate_branch)
 
@@ -173,8 +173,7 @@ def record_candidate(state, args):
         raise ValueError("Candidate is dirty or HEAD differs from request")
     branch = output(["git", "branch", "--show-current"], checkout)
     validate_branch(branch, active["issue"])
-    if output(["git", "merge-base", request["target_base_sha"], request["head_sha"]], checkout) != request["target_base_sha"]:
-        raise ValueError("Review an integration candidate containing the target base")
+    require_candidate_ancestry(request, checkout)
     if review_model(request) != "opus":
         if not previous or review_contract(request) != review_contract(previous):
             raise ValueError("Fable escalation must address the exact existing Opus candidate")
@@ -277,9 +276,13 @@ def record_review(state, args):
 
 
 def merge_candidate(state, args):
-    from finish_delivery import finish
+    from finish_delivery import finish, require_target_contains_merge
     if str(args.issue) in state["completed"]:
-        return state["completed"][str(args.issue)]
+        receipt = state["completed"][str(args.issue)]
+        target_sha = require_target_contains_merge(read(args.config), receipt, receipt.get("merge_sha"))
+        receipt = {**receipt, "target_head_sha": target_sha}
+        state["completed"][str(args.issue)] = receipt
+        return receipt
     active = active_issue(state)
     if active["issue"] != args.issue or active["stage"] != "merge":
         raise ValueError("Both Codex and Opus must accept this exact candidate before merge")

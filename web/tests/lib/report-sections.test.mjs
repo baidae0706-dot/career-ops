@@ -237,6 +237,13 @@ test("applyLineLabel: 4.0 is the apply line", () => {
   assert.equal(applyLineLabel(null), null);
 });
 
+test("applyLineLabel: a flagged posting above the line is not Recommended", () => {
+  assert.equal(applyLineLabel("4.9/5", "Proceed with Caution"), "Check the posting first");
+  assert.equal(applyLineLabel("4.9/5", "Suspicious"), "Check the posting first");
+  assert.equal(applyLineLabel("4.9/5", "High Confidence"), "Recommended");
+  assert.equal(applyLineLabel("3.1/5", "Proceed with Caution"), "Below the apply line");
+});
+
 test("applyCtaQuiet: below the apply line or caution legitimacy", () => {
   assert.equal(applyCtaQuiet({ score: 4.2 }), false);
   assert.equal(applyCtaQuiet({ score: 3.3 }), true);

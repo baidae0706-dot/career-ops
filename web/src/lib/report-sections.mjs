@@ -111,15 +111,26 @@ export function isVerdictHeading(heading) {
 /** Public methodology apply/don't-apply line (career-ops.org + ReportView). */
 export const APPLY_LINE = 4.0;
 
+/** @param {unknown} legitimacy */
+function flaggedPosting(legitimacy) {
+  const s = String(legitimacy ?? "").toLowerCase();
+  return /caut|precau|suspic|sospech|scam|fake/.test(s);
+}
+
 /**
+ * A score above the line on a flagged posting is not a recommendation, so the
+ * label never contradicts the legitimacy badge next to it.
+ *
  * @param {unknown} score
- * @returns {string | null} "Recommended" | "Below the apply line" | null
+ * @param {unknown} [legitimacy]
+ * @returns {string | null} "Recommended" | "Check the posting first" | "Below the apply line" | null
  */
-export function applyLineLabel(score) {
+export function applyLineLabel(score, legitimacy) {
   if (score == null || score === "") return null;
   const n = typeof score === "number" ? score : Number(String(score).match(/(\d+(?:\.\d+)?)/)?.[1]);
   if (!Number.isFinite(n)) return null;
-  return n >= APPLY_LINE ? "Recommended" : "Below the apply line";
+  if (n < APPLY_LINE) return "Below the apply line";
+  return flaggedPosting(legitimacy) ? "Check the posting first" : "Recommended";
 }
 
 /**
@@ -131,11 +142,7 @@ export function applyLineLabel(score) {
  * @returns {boolean}
  */
 export function applyCtaQuiet(opts) {
-  if (applyLineLabel(opts?.score) === "Below the apply line") return true;
-  const s = String(opts?.legitimacy ?? "").toLowerCase();
-  if (s.includes("caution") || s.includes("precau") || s.includes("caut")) return true;
-  if (s.includes("suspic") || s.includes("sospech") || s.includes("scam") || s.includes("fake")) return true;
-  return false;
+  return applyLineLabel(opts?.score) === "Below the apply line" || flaggedPosting(opts?.legitimacy);
 }
 
 /**
