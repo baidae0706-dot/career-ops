@@ -124,12 +124,17 @@ def live_candidate(config, request):
     return pr
 
 
+def require_cleanup_resolved(checkout):
+    blocked = Path(checkout) / "local/delivery/cleanup-blocked.json"
+    if blocked.exists():
+        raise RuntimeError(f"Prior process cleanup unresolved; inspect {blocked} before another run")
+    return blocked
+
+
 def prepare(config, source, checkout, folder):
     request = read(source)
     validate_request(request, config)
-    blocked = checkout / "local/delivery/cleanup-blocked.json"
-    if blocked.exists():
-        raise RuntimeError(f"Prior process cleanup unresolved; inspect {blocked} before another run")
+    blocked = require_cleanup_resolved(checkout)
     if any(c["host"] == "windows" for c in request["checks"]) and os.name != "nt":
         raise RuntimeError("Windows checks require Windows")
     if output(["git", "rev-parse", "HEAD"], checkout) != request["head_sha"]:
@@ -214,6 +219,7 @@ print(json.dumps(s,ensure_ascii=False))
 
 
 def collect(config, run, folder):
+    blocked = require_cleanup_resolved(HERE.parents[1])
     if not re.fullmatch(r"issue-\d+-[a-f0-9]{12}-r\d+", run):
         raise ValueError("Invalid run ID")
     current = status(config, run, emit=False)
@@ -247,11 +253,51 @@ print(json.dumps({{'files':files}}))
                 or not isinstance(checksum, str) or not re.fullmatch(r"[a-f0-9]{64}", checksum)):
             raise RuntimeError("Unsafe or ambiguous transport filename or digest")
         seen.add(name.casefold())
+    timeout = config.get("collection_file_timeout", 300)
+    if type(timeout) is not int or not 1 <= timeout <= 900:
+        raise ValueError("Collection file timeout must be an integer from 1 to 900 seconds")
     folder.mkdir(parents=True, exist_ok=False)
-    for name in sorted(manifest):
-        subprocess.run(["scp", "-O", "-q", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
-                        f"{config['ssh_host']}:{config['remote_root']}/runs/{run}/{name}", str(folder / name)],
-                       check=True, timeout=120)
+    log = folder.with_name(folder.name + ".transfer.log")
+    # File handles, rather than the caller's pipes, also bound an unknown cleanup
+    # failure: a surviving SSH child cannot hold the coordinator's output open.
+    with log.open("x", encoding="utf-8") as stream:
+        for name in sorted(manifest):
+            argv = ["scp", "-O", "-C", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
+                    f"{config['ssh_host']}:{config['remote_root']}/runs/{run}/{name}", str(folder / name)]
+            stream.write(f"TRANSFER {name} timeout={timeout}s\n")
+            stream.flush()
+            options = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
+                       else {"start_new_session": True})
+            try:
+                process = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=stream,
+                                           stderr=subprocess.STDOUT, **options)
+                try:
+                    code = process.wait(timeout=timeout)
+                except BaseException as error:
+                    stream.write("TIMEOUT\n" if isinstance(error, subprocess.TimeoutExpired) else "INTERRUPTED\n")
+                    stream.flush()
+                    try:
+                        terminate_tree(process)
+                    except CleanupError as cleanup:
+                        blocked.parent.mkdir(parents=True, exist_ok=True)
+                        # Exclusive creation preserves any earlier unresolved marker.
+                        with blocked.open("x", encoding="utf-8") as marker:
+                            json.dump(dict(run_id=run, file=name, pid=process.pid, argv=argv,
+                                           receipt=str(folder), diagnostics=str(log),
+                                           error=str(cleanup)), marker, ensure_ascii=False, indent=2)
+                        stream.write(f"CLEANUP BLOCKED: {cleanup}\n")
+                        raise
+                    stream.write("PROCESS TREE STOPPED\n")
+                    raise
+                stream.write(f"EXIT {code}\n")
+                stream.flush()
+                if code:
+                    raise subprocess.CalledProcessError(code, argv)
+            except BaseException as error:
+                stream.write(f"FAILED {type(error).__name__}: {error}\n")
+                stream.flush()
+                print(f"Collection failed for {name}; diagnostics: {log}", file=sys.stderr)
+                raise
     if any((folder / name).is_symlink() for name in manifest):
         raise RuntimeError("Collected artifact must not be a symbolic link")
     evidence = read(folder / "evidence.json")
@@ -269,8 +315,21 @@ print(json.dumps({{'files':files}}))
             or after.get("worker_alive") is not False or after.get("model_alive") is not False):
         raise RuntimeError("Terminal status changed during collection")
     write(folder / "collection.json", dict(status=current, request_digest=evidence.get("request_digest"),
-                                           transport_files=manifest))
+                                           transport_files=manifest, local_transfer=dict(
+                                               log=log.name, sha256=hashlib.sha256(log.read_bytes()).hexdigest())))
     print(json.dumps(dict(directory=str(folder), run_id=run)))
+
+
+def verify_collection_log(folder, collection):
+    """Local diagnostics are separate from immutable remote review evidence."""
+    value = collection.get("local_transfer")
+    expected = folder.name + ".transfer.log"
+    if not isinstance(value, dict) or value.get("log") != expected:
+        return ["Invalid local collection diagnostic path"]
+    path = folder.parent / expected
+    if path.is_symlink():
+        return ["Local collection diagnostics must not be a symbolic link"]
+    return verify_files(folder.parent, {expected: value.get("sha256")})
 
 
 def reconcile(config, run):
@@ -280,11 +339,13 @@ def reconcile(config, run):
     return result
 
 
-def premerge(config, folder):
+def premerge(config, folder, checkout=None):
+    require_cleanup_resolved(checkout if checkout is not None else HERE.parents[1])
     request, report, evidence, state = [read(folder / n) for n in
                                       ("request.json", "report.json", "evidence.json", "status.json")]
     validate_request(request, config)
     problems = gate(request, report, evidence) + verify_files(folder, evidence.get("files"))
+    problems += verify_collection_log(folder, read(folder / "collection.json"))
     if state.get("verdict") != "PASS" or problems:
         raise RuntimeError(f"Acceptance not satisfied: {problems}")
     for key, number in (("issue", request["issue"]), ("parent", request.get("parent_issue"))):

@@ -9,11 +9,13 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
+from types import SimpleNamespace
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from delivery import collect, run_id, write
+from delivery import collect, run_id, write, CleanupError, verify_collection_log, prepare, premerge
 from review_gate import digest
 
 
@@ -22,6 +24,9 @@ class CollectionTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="career-ops-collection-")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
+        location = patch("delivery.HERE", self.root / "scripts/delivery")
+        location.start()
+        self.addCleanup(location.stop)
         self.config = dict(repo="test/project", ssh_host="test-host", remote_root=self.root.as_posix().removeprefix(self.root.drive),
                            review_skill="matt-code-review", actual_models={"opus": "claude-opus-5-5"})
         self.request = dict(repo="test/project", issue=1, pr=2, round=1,
@@ -49,6 +54,7 @@ class CollectionTests(unittest.TestCase):
         return hashlib.sha256(path.read_bytes()).hexdigest()
 
     def call(self, target, *, manifest=None, after=None, transport=None, real_snapshot=False):
+        actual_popen = subprocess.Popen
         responses = [self.observed, dict(files=self.manifest if manifest is None else manifest),
                      self.observed if after is None else after]
 
@@ -57,7 +63,7 @@ class CollectionTests(unittest.TestCase):
             if real_snapshot and len(responses) == 2:
                 encoded = re.search(r"b64decode\('([^']+)'\)", command[-1]).group(1)
                 code = base64.b64decode(encoded).decode()
-                process = subprocess.Popen([sys.executable, "-c", code], text=True,
+                process = actual_popen([sys.executable, "-c", code], text=True,
                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 stdout, stderr = process.communicate(timeout=10)
                 if process.returncode:
@@ -75,14 +81,117 @@ class CollectionTests(unittest.TestCase):
             self.assertNotIn("*", source)
             name = source.rsplit("/", 1)[1]
             self.transfers.append(name)
-            if transport:
-                transport(name)
-            Path(destination).write_bytes((self.remote / name).read_bytes())
-            return subprocess.CompletedProcess(command, 0)
+            self.assertNotIn("-q", command)
+            self.assertTrue(hasattr(kwargs["stdout"], "fileno"))
+            self.assertEqual(kwargs["stderr"], subprocess.STDOUT)
+
+            def wait(**_):
+                if transport:
+                    try:
+                        transport(name)
+                    except subprocess.CalledProcessError as error:
+                        kwargs["stdout"].write(str(error))
+                        return error.returncode
+                Path(destination).write_bytes((self.remote / name).read_bytes())
+                return 0
+            return SimpleNamespace(pid=12345, wait=wait)
 
         with patch("delivery.subprocess.check_output", side_effect=ssh), \
-                patch("delivery.subprocess.run", side_effect=scp), contextlib.redirect_stdout(io.StringIO()):
+                patch("delivery.subprocess.Popen", side_effect=scp), contextlib.redirect_stdout(io.StringIO()):
             return collect(self.config, self.run, target)
+
+    def test_transfer_timeout_cleans_process_tree_and_keeps_diagnostics(self):
+        target = self.root / "timed-out"
+        self.config["collection_file_timeout"] = 1
+        process = SimpleNamespace(pid=12345, wait=lambda **kwargs: (_ for _ in ()).throw(subprocess.TimeoutExpired("scp", 1)))
+        with patch("delivery.status", return_value=self.observed), \
+                patch("delivery.remote", return_value=json.dumps(dict(files=self.manifest))), \
+                patch("delivery.subprocess.Popen", return_value=process), \
+                patch("delivery.subprocess.run", side_effect=subprocess.TimeoutExpired("scp", 120)), \
+                patch("delivery.terminate_tree") as cleanup:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                collect(self.config, self.run, target)
+            cleanup.assert_called_once_with(process)
+        self.assertFalse((target / "collection.json").exists())
+        log = target.with_name(target.name + ".transfer.log")
+        self.assertIn("TIMEOUT", log.read_text(encoding="utf-8"))
+
+    def test_real_transfer_timeout_stops_grandchild_and_does_not_inherit_caller_pipes(self):
+        target, ready, marker = self.root / "real-timeout", self.root / "child-ready", self.root / "orphan-write"
+        self.config["collection_file_timeout"] = 1
+        child = f"import pathlib,time;pathlib.Path({str(ready)!r}).write_text('ready');time.sleep(3);pathlib.Path({str(marker)!r}).write_text('leaked')"
+        parent = f"import subprocess,sys,time;subprocess.Popen([sys.executable,'-c',{child!r}]);print('transfer diagnostic',flush=True);time.sleep(30)"
+        actual_popen = subprocess.Popen
+        processes = []
+
+        def start(command, **kwargs):
+            if command[0] != "scp":
+                self.assertEqual(command[0], "taskkill")
+                return actual_popen(command, **kwargs)
+            self.assertEqual(command[0], "scp")
+            self.assertNotIn("-q", command)
+            self.assertTrue(hasattr(kwargs["stdout"], "fileno"))
+            self.assertEqual(kwargs["stderr"], subprocess.STDOUT)
+            process = actual_popen([sys.executable, "-c", parent], **kwargs)
+            processes.append(process)
+            deadline = time.monotonic() + 10
+            while not ready.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            self.assertTrue(ready.exists(), "Fixture grandchild did not start")
+            return process
+
+        try:
+            with patch("delivery.status", return_value=self.observed), \
+                    patch("delivery.remote", return_value=json.dumps(dict(files=self.manifest))), \
+                    patch("delivery.subprocess.Popen", side_effect=start):
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    collect(self.config, self.run, target)
+            time.sleep(2.3)
+            self.assertFalse(marker.exists(), "Transfer timeout left an SSH-like grandchild alive")
+            self.assertIsNotNone(processes[0].poll())
+            log = target.with_name(target.name + ".transfer.log").read_text(encoding="utf-8")
+            self.assertIn("transfer diagnostic", log)
+            self.assertIn("PROCESS TREE STOPPED", log)
+            self.assertFalse((target / "collection.json").exists())
+        finally:
+            for process in processes:
+                if process.poll() is None:
+                    from delivery import terminate_tree
+                    terminate_tree(process)
+
+    def test_unknown_cleanup_is_explicit_and_never_publishes_success(self):
+        target = self.root / "cleanup-failed"
+        process = SimpleNamespace(pid=12345, wait=lambda **kwargs: (_ for _ in ()).throw(subprocess.TimeoutExpired("scp", 1)))
+        with patch("delivery.status", return_value=self.observed), \
+                patch("delivery.remote", return_value=json.dumps(dict(files=self.manifest))), \
+                patch("delivery.subprocess.Popen", return_value=process), \
+                patch("delivery.terminate_tree", side_effect=CleanupError("original tree unconfirmed")):
+            with self.assertRaises(CleanupError):
+                collect(self.config, self.run, target)
+        blocked = self.root / "local/delivery/cleanup-blocked.json"
+        marker = json.loads(blocked.read_text())
+        self.assertEqual(marker["run_id"], self.run)
+        self.assertEqual(marker["pid"], process.pid)
+        self.assertFalse((target / "collection.json").exists())
+        self.assertIn("CLEANUP BLOCKED", target.with_name(target.name + ".transfer.log").read_text())
+        before = blocked.read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "cleanup unresolved"):
+            self.call(self.root / "fresh-retry")
+        with self.assertRaisesRegex(RuntimeError, "cleanup unresolved"):
+            prepare(self.config, self.remote / "request.json", self.root, self.root / "prepared")
+        with self.assertRaisesRegex(RuntimeError, "cleanup unresolved"):
+            premerge(self.config, target, self.root)
+        self.assertEqual(blocked.read_bytes(), before)
+        self.assertFalse((self.root / "fresh-retry").exists())
+
+    def test_transfer_budget_is_bounded_before_creating_a_receipt(self):
+        for timeout in (0, 901, True, "300"):
+            with self.subTest(timeout=timeout):
+                self.config["collection_file_timeout"] = timeout
+                with self.assertRaisesRegex(ValueError, "1 to 900"):
+                    self.call(self.root / "invalid-budget")
+                self.assertFalse((self.root / "invalid-budget").exists())
+        self.assertFalse(self.transfers)
 
     def test_original_bytes_and_control_files_are_collected_with_explicit_filenames(self):
         target = self.root / "receipt"
@@ -92,6 +201,11 @@ class CollectionTests(unittest.TestCase):
         self.assertEqual(collection["transport_files"], self.manifest)
         self.assertEqual(collection["request_digest"], digest(self.request))
         self.assertEqual(set(self.transfers), set(self.manifest))
+        self.assertEqual(verify_collection_log(target, collection), [])
+        log = target.with_name(target.name + ".transfer.log")
+        self.assertEqual(collection["local_transfer"]["sha256"], self.sha(log))
+        log.write_text("changed", encoding="utf-8")
+        self.assertTrue(verify_collection_log(target, collection))
 
     def test_running_or_uncertain_round_is_not_collected(self):
         for state in (dict(stage="model-review", worker_alive=True, model_alive=True),

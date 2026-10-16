@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from delivery import HERE, read, write, output, run_id, files_index
+from delivery import HERE, read, write, output, run_id, files_index, verify_collection_log, require_cleanup_resolved
 from review_gate import (IDENTITY, digest, gate, validate_request, verify_files, review_model,
                          codex_gate, review_contract, review_context_digest, validate_title, validate_branch)
 
@@ -230,6 +230,7 @@ def record_acceptance(state, args):
 
 def record_review(state, args):
     active = active_issue(state)
+    require_cleanup_resolved(Path(active["checkout"]))
     pending = active.get("pending", {})
     folder = args.folder.resolve()
     request = read(folder / "request.json")
@@ -245,7 +246,7 @@ def record_review(state, args):
             or collection.get("request_digest") != digest(request)
             or any(observed.get(key) != status.get(key) for key in ("request_digest", "finished", "stage"))):
         raise ValueError("Review is not a collected, stopped terminal round")
-    problems = verify_files(folder, evidence.get("files"))
+    problems = verify_files(folder, evidence.get("files")) + verify_collection_log(folder, collection)
     if problems:
         raise ValueError(str(problems))
     role = "opus" if review_model(request) == "opus" else "fable"
@@ -261,7 +262,7 @@ def record_review(state, args):
     receipt = dict(path=str(folder), request_digest=digest(request), identity={key: request[key] for key in IDENTITY},
                    role=role, verdict="PASS" if passed else "CHANGES_REQUIRED" if isinstance(report, dict)
                    and report.get("verdict") == "CHANGES_REQUIRED" else "INSUFFICIENT", problems=problems,
-                   evidence_digest=digest(evidence), status_digest=digest(status), session_id=session,
+                   evidence_digest=digest(evidence), status_digest=digest(status), collection_digest=digest(collection), session_id=session,
                    context_digest=review_context_digest(request, evidence) if passed else None)
     active["reviews"].append(receipt)
     active.pop("pending")
@@ -286,6 +287,7 @@ def merge_candidate(state, args):
         raise ValueError("A different pending operation must be reconciled first")
     request = active["candidate"]
     checkout = Path(active["checkout"])
+    require_cleanup_resolved(checkout)
     if output(["git", "rev-parse", "HEAD"], checkout) != request["head_sha"] or output(["git", "status", "--porcelain"], checkout):
         raise ValueError("Implementation checkout changed since candidate acceptance")
     acceptance = active["codex_acceptance"]
@@ -299,6 +301,8 @@ def merge_candidate(state, args):
         if (review_contract(reviewed_request) != review_contract(request)
                 or digest(evidence) != receipt["evidence_digest"]
                 or digest(read(folder / "status.json")) != receipt["status_digest"]
+                or digest(read(folder / "collection.json")) != receipt.get("collection_digest")
+                or verify_collection_log(folder, read(folder / "collection.json"))
                 or gate(reviewed_request, read(folder / "report.json"), evidence)
                 or verify_files(folder, evidence.get("files"))):
             raise ValueError(f"Stored {role} review changed or no longer passes")

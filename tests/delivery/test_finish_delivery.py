@@ -127,10 +127,14 @@ class FinishDeliveryTests(unittest.TestCase):
         for name, value in (("request", self.request), ("report", self.report),
                             ("status", dict(verdict="PASS")), ("codex-acceptance", self.codex)):
             (self.folder / f"{name}.json").write_text(json.dumps(value), encoding="utf-8")
+        log = self.folder.with_name(self.folder.name + ".transfer.log")
+        log.write_text("Synthetic transfer diagnostics")
+        (self.folder / "collection.json").write_text(json.dumps(dict(local_transfer=dict(
+            log=log.name, sha256=hashlib.sha256(log.read_bytes()).hexdigest()))))
         self.evidence["files"] = {
             path.name: hashlib.sha256(path.read_bytes()).hexdigest()
             for path in self.folder.iterdir()
-            if path.name not in ("evidence.json", "status.json", "codex-acceptance.json")
+            if path.name not in ("evidence.json", "status.json", "codex-acceptance.json", "collection.json")
         }
         (self.folder / "evidence.json").write_text(json.dumps(self.evidence), encoding="utf-8")
 
@@ -226,6 +230,16 @@ class FinishDeliveryTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()):
             return finish_delivery.finish(self.config, self.folder, self.checkout,
                                            reconcile_operation=reconcile_operation)
+
+    def test_unresolved_checkout_transfer_cleanup_blocks_finish_before_github(self):
+        blocked = self.checkout / "local/delivery/cleanup-blocked.json"
+        blocked.parent.mkdir(parents=True)
+        blocked.write_text('{"error":"fixture unresolved SSH tree"}')
+        original = blocked.read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "cleanup unresolved"):
+            self.finish()
+        self.assertEqual(self.mutations, [])
+        self.assertEqual(blocked.read_bytes(), original)
 
     def test_accepted_candidate_merges_and_closes_once_across_restarts(self):
         before = {path.name: path.read_bytes() for path in self.folder.iterdir()}

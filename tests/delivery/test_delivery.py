@@ -220,7 +220,8 @@ class DeliveryTests(unittest.TestCase):
 
     def test_premerge_rejects_changed_spec_or_failed_ci(self):
         with tempfile.TemporaryDirectory() as temp:
-            root=Path(temp)
+            root=Path(temp) / "receipt"
+            root.mkdir()
             (root/"windows-check.log").write_text("real output")
             for axis in ("standards", "spec"):
                 (root/f"{axis}-child.json").write_text("independent report")
@@ -232,6 +233,10 @@ class DeliveryTests(unittest.TestCase):
             evidence["issue_digest"]=spec_digest(dict(title="old",body="req",comments=[]))
             for name,value in (("request",self.request),("report",self.report),("evidence",evidence),("status",dict(verdict="PASS"))):
                 write(root/f"{name}.json",value)
+            log = root.with_name(root.name + ".transfer.log")
+            log.write_text("Synthetic transfer diagnostics")
+            write(root / "collection.json", dict(local_transfer=dict(log=log.name,
+                sha256=files_index(log.parent, [log.name])[log.name])))
             with patch("delivery.gh",return_value=dict(title="changed",body="req",comments=[])), self.assertRaises(RuntimeError):
                 premerge(self.config,root)
             pr=dict(state="OPEN",isDraft=False,mergeable="MERGEABLE",statusCheckRollup=[dict(__typename="CheckRun",status="IN_PROGRESS")])

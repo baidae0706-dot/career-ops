@@ -138,7 +138,21 @@ then records `INSUFFICIENT` for collection and a new review round. Collection
 requires explicitly stopped worker and model observations, pins ordinary remote
 files, transfers explicit filenames with SCP, and rechecks the terminal identity.
 A failed transfer preserves its partial directory; retry the same run into a new
-directory without relaunching it or overwriting evidence. A busy lock,
+directory without relaunching it or overwriting evidence. SCP runs in its own
+controlled process tree with compression and a bounded per-file budget (300
+seconds by default; optional `collection_file_timeout` is an integer from 1 to
+900 seconds). Output goes to the sibling `RECEIPT.transfer.log`, never inherited
+coordinator pipes. `collection.json` binds that local diagnostic filename and
+SHA-256 separately from remote artifacts; registration and premerge recheck it.
+Timeout or interruption stops the transfer's tree before returning. If cleanup
+cannot be confirmed, the existing checkout-local
+`local/delivery/cleanup-blocked.json` retains the run, filename, PID, command and
+log path without replacing an older marker. The same checkout's collect,
+prepare, review registration, premerge and merge entries refuse further work
+while that marker exists. The original Codex owner must prove the original tree
+stopped and retain recovery evidence before resolving the marker; this guard is
+not an automatic OS proof service or a cross-checkout coordinator. No success
+receipt is published for a failed or uncertain transfer. A busy lock,
 unknown process identity or uncertain launch remains pending, never relaunched.
 A merge reruns `merge --issue N`, which reads actual PR/merge/comment/closure
 state. The finish journal lives beside the immutable review receipt. A provably

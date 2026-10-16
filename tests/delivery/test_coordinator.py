@@ -176,6 +176,37 @@ class CoordinatorTests(unittest.TestCase):
         self.assertEqual(self.run_cli("heartbeat")["decision"], "DONT_NOTIFY")
         self.assertEqual(self.run_cli("show")["revision"], revision)
 
+    def test_changed_local_transfer_diagnostics_do_not_resolve_pending_review(self):
+        checkout, path, request = self.candidate()
+        self.run_cli("candidate", path, "--checkout", checkout, "--owner", "codex-thread")
+        self.run_cli("intent", "--kind", "review", "--operation", "review-1")
+        folder = self.review_receipt(request)
+        collection = json.loads((folder / "collection.json").read_text())
+        log = folder.with_name(folder.name + ".transfer.log")
+        log.write_text("original transfer diagnostics")
+        collection["local_transfer"] = dict(log=log.name, sha256=files_index(log.parent, [log.name])[log.name])
+        write(folder / "collection.json", collection)
+        for altered in ({key: value for key, value in collection.items() if key != "local_transfer"},
+                        {**collection, "local_transfer": None}):
+            write(folder / "collection.json", altered)
+            self.run_cli("review", folder, success=False)
+            self.assertEqual(self.run_cli("next")["action"], "reconcile")
+        write(folder / "collection.json", collection)
+        log.write_text("changed diagnostics")
+        result = self.run_cli("review", folder, success=False)
+        self.assertIn("Changed evidence", result.stderr)
+        self.assertEqual(self.run_cli("next")["action"], "reconcile")
+        log.write_text("original transfer diagnostics")
+        blocked = checkout / "local/delivery/cleanup-blocked.json"
+        blocked.parent.mkdir(parents=True)
+        write(blocked, dict(error="fixture cleanup uncertainty"))
+        self.run_cli("review", folder, success=False)
+        self.assertEqual(self.run_cli("next")["action"], "reconcile")
+        blocked.unlink()  # Fixture has no process; production requires retained stop proof.
+        self.run_cli("review", folder)
+        receipt = self.run_cli("show")["active"]["opus_receipt"]
+        self.assertEqual(receipt["collection_digest"], digest(collection))
+
     def test_revision_conflict_does_not_acquire_a_writer(self):
         self.run_cli("init", self.queue)
         result = subprocess.run([sys.executable, str(SCRIPT), "--config", str(self.config), "--state", str(self.state),
@@ -228,7 +259,10 @@ class CoordinatorTests(unittest.TestCase):
         write(folder / "evidence.json", evidence)
         status = dict(run_id=run_id(request),stage="completed",verdict=verdict,request_digest=digest(request),finished=1,worker_alive=False,model_alive=False)
         write(folder / "status.json", status)
-        write(folder / "collection.json", dict(request_digest=digest(request),status=status))
+        log = folder.with_name(folder.name + ".transfer.log")
+        log.write_text("Synthetic transfer diagnostics")
+        write(folder / "collection.json", dict(request_digest=digest(request),status=status,
+              local_transfer=dict(log=log.name, sha256=files_index(log.parent, [log.name])[log.name])))
         return folder
 
     def test_opus_without_codex_cannot_merge_and_missing_or_old_receipts_cannot_pass(self):

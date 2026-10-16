@@ -15,7 +15,7 @@ import subprocess
 import uuid
 from pathlib import Path
 
-from delivery import HERE, output, premerge, read, terminate_tree, write
+from delivery import HERE, output, premerge, read, terminate_tree, write, require_cleanup_resolved
 from review_gate import codex_gate, digest, gate, spec_digest, validate_request, verify_files
 
 
@@ -234,6 +234,7 @@ def finish(config, folder, checkout, codex_acceptance=None, reconcile_operation=
     if reconcile_operation not in (None, "merge", "close"):
         raise ValueError("Only exact-identity merge or close may be reconciled for retry")
     folder, checkout = Path(folder).resolve(), Path(checkout).resolve()
+    require_cleanup_resolved(checkout)
     destination = folder.with_name(folder.name + ".finish")
     destination.mkdir(exist_ok=True)
     with state_lock(destination / "state.json"):
@@ -274,7 +275,7 @@ def finish_locked(config, folder, checkout, codex_path, destination, reconcile_o
         if target["object"]["sha"] != request["target_base_sha"]:
             raise RuntimeError("Live target branch changed since review")
         with contextlib.redirect_stdout(io.StringIO()):
-            premerge(config, folder)
+            premerge(config, folder, checkout)
         if state.get("pending") == "merge":
             state.setdefault("reconciliations", []).append(dict(operation="merge", reason="exact_head_open_and_gates_rechecked"))
         send_mutation(config, state, state_path, destination, "merge", "PUT",
