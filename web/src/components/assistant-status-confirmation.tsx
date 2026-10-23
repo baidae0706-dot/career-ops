@@ -2,6 +2,7 @@
 
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { uiLabel } from "@/lib/ui-labels";
 
 export type StatusConfirmationPart = {
   type: "confirm";
@@ -24,7 +25,7 @@ export function StatusConfirmationCard({ part, onConfirm }: {
   const [announcement, setAnnouncement] = useState("");
   const saving = part.state === "saving";
   const message = saving ? "正在保存状态变更…" : part.state === "done" ? "状态已保存。"
-    : part.state === "cancelled" ? "cancelled" : part.message ?? "";
+    : part.state === "cancelled" ? "已取消" : part.message ?? "";
   const canDecide = part.state === "pending" || saving || (part.state === "failed" && part.retryable);
 
   useLayoutEffect(() => {
@@ -57,7 +58,7 @@ export function StatusConfirmationCard({ part, onConfirm }: {
     <>
       <div role="group" aria-labelledby={`${id}-summary`} data-assistant-confirmation={part.state} tabIndex={-1} className="rounded-xl border border-brand/40 bg-brand-soft p-2.5 focus-visible:outline-2 focus-visible:outline-brand">
         <div id={`${id}-summary`} className="text-xs font-medium text-foreground">{part.summary}</div>
-        <p className="mt-1 text-xs text-muted">申请编号{part.statusChange.n} → {part.statusChange.status}</p>
+        <p className="mt-1 text-xs text-muted">申请编号{part.statusChange.n} → {uiLabel(part.statusChange.status)}</p>
         {message && (
           <div ref={result} tabIndex={-1} aria-labelledby={`${id}-summary ${id}-result`} className="mt-1 rounded text-xs text-faint focus-visible:outline-2 focus-visible:outline-brand">
             <span id={`${id}-result`}>{message}</span>

@@ -4,6 +4,11 @@ const LABELS: Record<string, string> = {
   "MENTIONED MORE THAN ONCE": "出现多次",
   "MENTIONED ONCE — CONSIDER REINFORCING": "仅出现一次，可以补充真实证据",
   "NOT FOUND IN THE CV": "简历中未找到",
+  "NO AI CLI IS SET UP. CHOOSE ONE IN CONFIG, OR EDIT THE WORDING BY HAND.": "尚未配置 AI CLI，请在配置页中选择，或手动编辑表述。",
+  "THIS AI CLI CANNOT BE LIMITED TO READ-ONLY ACCESS, SO THE REWRITE DID NOT RUN. CHOOSE CLAUDE, CODEX OR GROK IN CONFIG, OR EDIT THE WORDING BY HAND.": "无法将此 AI CLI 限制为只读访问，因此未执行改写。请在配置页中选择 Claude、Codex 或 Grok，或手动编辑表述。",
+  "THE AI CLI COULD NOT BE STARTED WITH READ-ONLY ACCESS, SO NOTHING RAN.": "无法以只读权限启动 AI CLI，未执行任何任务。",
+  "THE AI CLI DID NOT FINISH. CHECK THAT IT IS SIGNED IN, THEN TRY AGAIN.": "AI CLI 未完成，请确认已登录后再重试。",
+  "THE AI CLI REPLIED WITHOUT A USABLE BULLET. TRY A DIFFERENT INSTRUCTION.": "AI CLI 没有返回可用要点，请换一种改写要求。",
   "FORMAL": "正式",
   "DIRECT": "直接",
   "CONVERSATIONAL": "自然交流",
@@ -46,7 +51,12 @@ const LABELS: Record<string, string> = {
 };
 
 export function uiLabel(value: string): string {
-  return LABELS[value.toUpperCase()] ?? value;
+  const label = LABELS[value.toUpperCase()];
+  if (label) return label;
+  return value
+    .replace(/^The rewrite was discarded because it adds claims this bullet does not support:/, "已舍弃改写，因为它新增了原要点无法支持的陈述：")
+    .replace(/ cannot be permission-restricted — this agent runs with its default access$/, " 无法施加权限限制，将使用默认访问权限运行")
+    .replace(/ is only partly restricted: this worker has to open urls it is handed, which its sandbox only allows alongside write access — its writes are confined to the project folder, not blocked$/, " 仅受部分权限限制：此任务需要打开收到的链接，而沙箱仅在允许写入时支持此操作；写入范围限制在项目目录内，并未完全禁止写入");
 }
 
 // Translate only the displayed outcome; retain the official source state/message
@@ -56,5 +66,17 @@ export function employerOutcomeLabel(message: string): string {
     .replace(/^Failed — /, "扫描失败 — ")
     .replace(/^Partial \/ incomplete — (\d+) matches\./, "扫描未完成 — 找到 $1 个匹配职位。")
     .replace(/^Completed — (\d+) matches from /, "扫描完成 — 找到 $1 个匹配职位，来自 ")
-    .replace(/^No matches for this scan — /, "本次扫描没有匹配职位 — ");
+    .replace(/^No matches for this scan — /, "本次扫描没有匹配职位 — ")
+    .replace(/source response exceeded size limit/g, "来源响应超过大小限制")
+    .replace(/source returned no readable result/g, "来源没有返回可读取的结果")
+    .replace(/source request failed or returned invalid data/g, "来源请求失败或返回了无效数据")
+    .replace(/source request failed or timed out/g, "来源请求失败或超时")
+    .replace(/source stopped before reporting all postings/g, "来源未返回全部职位便已停止")
+    .replace(/source could not start/g, "来源无法启动")
+    .replace(/source timed out/g, "来源超时")
+    .replace(/source stopped early/g, "来源提前停止")
+    .replace(/source failed/g, "来源失败")
+    .replace(/scan interrupted/g, "扫描已中断")
+    .replace(/page cap \((\d+) pages\) limits coverage/g, "达到 $1 页上限，覆盖范围受限")
+    .replace(/source-data problem: (\d+) records missing company, title or posting identity/g, "来源数据有问题：$1 条记录缺少公司、职位名称或职位标识");
 }

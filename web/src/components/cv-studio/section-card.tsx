@@ -273,13 +273,13 @@ function RewritePanel({ n, bullet, current, onUse }: { n: string; bullet: Studio
         ))}
       </div>
       {proposal.kind === "running" && <p className="mt-2 text-xs text-muted">你的 AI CLI 正在起草改写。这会消耗额度，可能需要一分钟。</p>}
-      {proposal.kind === "failed" && <p role="alert" className="mt-2 text-xs text-red-700 dark:text-red-300">{proposal.error}</p>}
+      {proposal.kind === "failed" && <p role="alert" className="mt-2 text-xs text-red-700 dark:text-red-300">{uiLabel(proposal.error)}</p>}
       {proposal.kind === "ready" && (
         <div className="mt-2 rounded-md border border-border bg-background p-2 text-sm">
           <p className="leading-relaxed text-foreground" aria-label={"改写建议"}>
             <Diff before={current} after={proposal.text} />
           </p>
-          {proposal.warning && <p role="status" className="mt-1.5 text-xs text-amber-800 dark:text-amber-300">{proposal.warning}。起草过程中，它可能读取或修改文件。</p>}
+          {proposal.warning && <p role="status" className="mt-1.5 text-xs text-amber-800 dark:text-amber-300">{uiLabel(proposal.warning)}。起草过程中，它可能读取或修改文件。</p>}
           <div className="mt-1.5 flex gap-2">
             <button onClick={() => onUse(proposal.text, proposal.keywords)} className="rounded-full bg-brand px-3 py-0.5 text-xs font-medium text-brand-foreground">采用</button>
             <button onClick={() => setProposal({ kind: "idle" })} className="rounded-full px-3 py-0.5 text-xs text-muted hover:text-foreground">拒绝</button>

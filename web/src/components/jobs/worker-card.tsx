@@ -146,7 +146,7 @@ export function WorkerCard({
       )}
       {fencing && (
         <div className={cn("mt-1 text-amber-700 dark:text-amber-400", inline ? "text-xs" : "text-[10px]")}>
-          {fencing}
+          {uiLabel(fencing)}
         </div>
       )}
       {tokens > 0 && (
