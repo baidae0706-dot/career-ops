@@ -58,6 +58,23 @@ function pickField(item, spec) {
 
 const ALLOWED_DEFAULT_KEYS = new Set(['title', 'url', 'company', 'location']);
 
+// Zhaopin's public API still emits legacy http jobdetail URLs, although the
+// same detail pages are served over HTTPS. Upgrade only that exact URL shape;
+// arbitrary actor-supplied http URLs must still fail the HTTPS guard below.
+export function normalizeJobUrl(value) {
+  const raw = String(value || '');
+  try {
+    const url = new URL(raw);
+    if (url.protocol === 'http:' && url.hostname === 'www.zhaopin.com'
+        && !url.username && !url.password && !url.port && !url.search && !url.hash
+        && /^\/jobdetail\/[A-Za-z0-9]+\.htm$/.test(url.pathname)) {
+      url.protocol = 'https:';
+      return url.href;
+    }
+  } catch {}
+  return raw;
+}
+
 // Actors return URLs from arbitrary external sites — treat them as untrusted.
 // Reject anything that isn't https so javascript:/data:/file:/http: URLs can't
 // end up clickable in pipeline.md or in the JD-cache filename hash.
@@ -160,6 +177,7 @@ export function normalizeItem(item, fieldMap, defaults) {
     if (!ALLOWED_DEFAULT_KEYS.has(k)) continue;
     if (!out[k]) out[k] = String(v);
   }
+  out.url = normalizeJobUrl(out.url);
   return out;
 }
 
@@ -211,6 +229,8 @@ export default {
           if (!isHttpsUrl(normalized.url)) return null;
           if (!useLocalJd) return normalized;
           const descriptionBody = htmlToText(pickField(item, entry.field_map.description));
+          // Expose the same body to scanner content filters, even below the cache threshold.
+          normalized.description = descriptionBody;
           if (!descriptionBody || descriptionBody.length < MIN_JD_BODY_CHARS) {
             return normalized;
           }
