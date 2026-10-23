@@ -53,37 +53,37 @@ export function ApplyChecklist({
   return (
     <PageFrame className="max-w-3xl">
       <Link href={backHref} className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-brand">
-        <ArrowLeft className="size-4" /> Pipeline
+        <ArrowLeft className="size-4" /> 求职进展
       </Link>
       <header className="mt-5">
-        <p className="font-mono text-xs uppercase tracking-[0.18em] text-faint">Apply checklist</p>
+        <p className="font-mono text-xs uppercase tracking-[0.18em] text-faint">投递清单</p>
         <h1 className="mt-2 font-display text-3xl tracking-tight text-landing">{company}</h1>
         {role && <p className="mt-1 text-muted">{role}</p>}
         <Link href={reportHref} className="mt-3 inline-flex text-sm text-brand hover:underline">
-          Back to the report
+          返回报告
         </Link>
       </header>
 
-      <Section title="Posting">
+      <Section title={"职位原文"}>
         {postingUrl ? (
           <div className="flex flex-wrap items-center gap-2">
             <a href={postingUrl} target="_blank" rel="noreferrer" className={PILL}>
-              Open <ExternalLink className="size-3.5" />
+              打开 <ExternalLink className="size-3.5" />
             </a>
-            <CopyButton text={postingUrl} label="Copy URL" />
+            <CopyButton text={postingUrl} label={"复制链接"} />
             <span className="min-w-0 break-all font-mono text-xs text-faint">{postingUrl}</span>
           </div>
         ) : (
-          <Empty>No posting URL on this application.</Empty>
+          <Empty>这条申请没有职位链接。</Empty>
         )}
       </Section>
 
-      <Section title="Resume and cover letter">
-        <PdfRow label="Resume" file={resume} empty="No resume in the PDF index for this report." />
-        <PdfRow label="Cover letter" file={cover} empty="No cover letter in the PDF index for this report." />
+      <Section title={"简历与求职信"}>
+        <PdfRow label={"简历"} file={resume} empty="这份报告的 PDF 索引中没有简历。" />
+        <PdfRow label={"求职信"} file={cover} empty="这份报告的 PDF 索引中没有求职信。" />
       </Section>
 
-      <Section title="Application answers">
+      <Section title={"申请问答"}>
         {answers.length > 0 ? (
           <div className="grid gap-3">
             {answers.map((item) => (
@@ -91,13 +91,13 @@ export function ApplyChecklist({
             ))}
           </div>
         ) : (
-          <Empty>No saved application answers on this report.</Empty>
+          <Empty>这份报告尚未保存申请问答。</Empty>
         )}
       </Section>
 
-      <Section title="Work history">
+      <Section title={"工作经历"}>
         {cvMissing ? (
-          <Empty>cv.md is not in this workspace.</Empty>
+          <Empty>工作区中没有 cv.md。</Empty>
         ) : work.length > 0 ? (
           <div className="grid gap-3">
             {work.map((item) => (
@@ -105,27 +105,27 @@ export function ApplyChecklist({
             ))}
           </div>
         ) : (
-          <Empty>No work history in cv.md.</Empty>
+          <Empty>cv.md 中没有工作经历。</Empty>
         )}
       </Section>
 
-      <Section title="Education">
+      <Section title={"教育经历"}>
         {cvMissing ? (
-          <Empty>cv.md is not in this workspace.</Empty>
+          <Empty>工作区中没有 cv.md。</Empty>
         ) : education ? (
-          <CopyField item={{ label: "Education", text: education }} />
+          <CopyField item={{ label: "教育经历", text: education }} />
         ) : (
-          <Empty>No education section in cv.md.</Empty>
+          <Empty>cv.md 中没有教育经历。</Empty>
         )}
       </Section>
 
-      <Section title="Portal tips">
+      <Section title={"招聘网站提示"}>
         <table className="w-full text-sm">
-          <caption className="sr-only">Portal tips</caption>
+          <caption className="sr-only">招聘网站提示</caption>
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-faint">
-              <th className="py-2 pr-4 font-medium">Portal</th>
-              <th className="py-2 font-medium">Tip</th>
+              <th className="py-2 pr-4 font-medium">招聘网站</th>
+              <th className="py-2 font-medium">提示</th>
             </tr>
           </thead>
           <tbody>
@@ -139,13 +139,13 @@ export function ApplyChecklist({
         </table>
       </Section>
 
-      <Section title="After you submit">
+      <Section title={"提交之后"}>
         <div className="flex flex-wrap items-start gap-2">
           <AppliedButton trackerNum={trackerNum} status={status} />
           <SeedButton trackerNum={trackerNum} />
           <MarkPdfReadyButton reportNum={reportNum} ready={pdfReady} />
         </div>
-        {!trackerNum && <p className="mt-2 text-xs text-faint">Applied and seed follow-up need a tracker row.</p>}
+        {!trackerNum && <p className="mt-2 text-xs text-faint">标记已投递和创建跟进记录需要先有求职跟踪条目。</p>}
       </Section>
     </PageFrame>
   );
@@ -169,7 +169,7 @@ function CopyField({ item }: { item: CopyItem }) {
     <div className="rounded-xl border border-border bg-surface/30 px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">{item.label}</p>
-        <CopyButton text={item.text} label="Copy" />
+        <CopyButton text={item.text} label={"复制"} />
       </div>
       <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-muted">{item.text}</pre>
     </div>
@@ -182,9 +182,9 @@ function PdfRow({ label, file, empty }: { label: string; file: PdfFile; empty: s
     <div className="mb-3 flex flex-wrap items-center gap-2">
       <span className="text-sm font-medium">{label}</span>
       <a href={file.downloadHref} target="_blank" rel="noreferrer" className={PILL}>
-        Download
+        下载
       </a>
-      <CopyButton text={file.relativePath} label="Copy path" />
+      <CopyButton text={file.relativePath} label={"复制路径"} />
       <span className="font-mono text-xs text-faint">{file.relativePath}</span>
     </div>
   );
@@ -206,7 +206,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
         window.setTimeout(() => setState("idle"), 1500);
       }}
     >
-      {state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : label}
+      {state === "copied" ? "已复制" : state === "failed" ? "复制失败" : label}
     </button>
   );
 }
@@ -225,7 +225,7 @@ function AppliedButton({ trackerNum, status }: { trackerNum: string | null; stat
       await saveStatus(trackerNum, status, "Applied");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not mark this Applied.");
+      setError(err instanceof Error ? err.message : "无法将这条申请标记为已投递。");
     } finally {
       setBusy(false);
     }
@@ -234,7 +234,7 @@ function AppliedButton({ trackerNum, status }: { trackerNum: string | null; stat
   return (
     <span className="inline-flex flex-col items-start gap-1">
       <button type="button" className={PILL} disabled={!trackerNum || busy || applied} onClick={markApplied}>
-        {busy ? "Saving…" : "Applied"}
+        {busy ? "正在保存…" : "标记已投递"}
       </button>
       {error && <span className="max-w-xs text-xs text-red-500">{error}</span>}
     </span>
@@ -260,13 +260,13 @@ function SeedButton({ trackerNum }: { trackerNum: string | null }) {
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
-        setError(typeof body?.error === "string" ? body.error : "Could not seed the follow-up.");
+        setError(typeof body?.error === "string" ? body.error : "无法创建跟进记录。");
         return;
       }
-      setNote(body?.seeded !== false ? "Follow-up seeded." : body?.reason === "disabled" ? "Follow-ups are turned off in your profile, so nothing was seeded." : "Already seeded.");
+      setNote(body?.seeded !== false ? "已创建跟进记录。" : body?.reason === "disabled" ? "个人配置中已关闭跟进提醒，未创建跟进记录。" : "跟进记录已存在。");
       router.refresh();
     } catch {
-      setError("Could not seed the follow-up.");
+      setError("无法创建跟进记录。");
     } finally {
       setBusy(false);
     }
@@ -275,7 +275,7 @@ function SeedButton({ trackerNum }: { trackerNum: string | null }) {
   return (
     <span className="inline-flex flex-col items-start gap-1">
       <button type="button" className={PILL} disabled={!trackerNum || busy} onClick={seed}>
-        {busy ? "Saving…" : "Seed follow-up"}
+        {busy ? "正在保存…" : "创建跟进记录"}
       </button>
       {note && <span className="text-xs text-muted">{note}</span>}
       {error && <span className="max-w-xs text-xs text-red-500">{error}</span>}

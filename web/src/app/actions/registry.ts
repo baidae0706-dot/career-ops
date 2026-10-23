@@ -1,3 +1,4 @@
+import { uiLabel } from "@/lib/ui-labels";
 // The ONE action registry — the single source of truth for "what can be done".
 // Both UI controls and the assistant dispatch the SAME entries via dispatch(),
 // so the human UI and the agentic UI can never drift. Pure module (no React
@@ -132,7 +133,7 @@ const ACTIONS: Record<string, ActionDef> = {
     sideEffect: "none",
     run: (raw, ctx) => {
       const path = raw.path;
-      if (!isStr(path) || !isAllowedPath(path)) return { status: "ignored", note: "blocked navigation" };
+      if (!isStr(path) || !isAllowedPath(path)) return { status: "ignored", note: "已阻止跳转" };
       ctx.push(path);
       return { status: "done" };
     },
@@ -161,11 +162,11 @@ const ACTIONS: Record<string, ActionDef> = {
     sideEffect: "spend",
     run: (raw, ctx) => {
       const url = raw.url;
-      if (!isStr(url) || !/^https?:\/\//i.test(url)) return { status: "ignored", note: "invalid url" };
+      if (!isStr(url) || !/^https?:\/\//i.test(url)) return { status: "ignored", note: "链接无效" };
       const ex = ctx.jobForUrl(url);
-      if (ex && ex.status !== "error" && !raw.rerun) return { status: "ignored", note: "already evaluated" };
+      if (ex && ex.status !== "error" && !raw.rerun) return { status: "ignored", note: "已经评估过" };
       const id = ctx.startJob({
-        title: isStr(raw.title) ? String(raw.title) : "Evaluate",
+        title: isStr(raw.title) ? String(raw.title) : "评估",
         subtitle: isStr(raw.subtitle) ? String(raw.subtitle) : undefined,
         kind: "evaluate",
         input: url,
@@ -179,7 +180,7 @@ const ACTIONS: Record<string, ActionDef> = {
     sideEffect: "spend",
     run: (raw, ctx) => {
       const company = raw.company;
-      if (!isStr(company)) return { status: "ignored", note: "missing company" };
+      if (!isStr(company)) return { status: "ignored", note: "缺少公司名称" };
       const target = normCompany(company);
       const rerun = raw.rerun === true;
       const cap = Number.isFinite(Number(raw.max)) ? Math.min(BATCH_CAP, Number(raw.max)) : BATCH_CAP;
@@ -201,7 +202,7 @@ const ACTIONS: Record<string, ActionDef> = {
       if (pending.length === 0) {
         return {
           status: "ignored",
-          note: matches.length > 0 ? `Already evaluated every ${company} posting.` : `No pending ${company} postings in your inbox.`,
+          note: matches.length > 0 ? `已评估所有 ${company} 的职位。` : `待评估列表中没有 ${company} 的职位。`,
         };
       }
 
@@ -210,7 +211,7 @@ const ACTIONS: Record<string, ActionDef> = {
         const ids = pending
           .map((j) =>
             ctx.startJob({
-              title: `Evaluate · ${j.company}`,
+              title: `评估 · ${j.company}`,
               subtitle: j.role,
               kind: "evaluate",
               input: j.url,
@@ -226,7 +227,7 @@ const ACTIONS: Record<string, ActionDef> = {
       const estimate = ctx.estimateCost?.("evaluate", pending.length) ?? {};
       return {
         status: "confirm",
-        summary: formatBatchSpendConfirmation(`Evaluate ${pending.length} ${company} postings`, pending.length, estimate),
+        summary: formatBatchSpendConfirmation(`评估 ${pending.length} ${company} 个职位`, pending.length, estimate),
         run: fire,
       };
     },
@@ -237,12 +238,12 @@ const ACTIONS: Record<string, ActionDef> = {
     // never spends, so it bypasses the confirm gate. The provider clamps/validates.
     sideEffect: "none",
     run: (raw, ctx) => {
-      if (!ctx.applyExplore) return { status: "ignored", note: "explore unavailable here" };
+      if (!ctx.applyExplore) return { status: "ignored", note: "当前页面无法发现职位" };
       const run = raw.run === true;
       const merge = raw.merge === true;
       ctx.push("/explore");
       ctx.applyExplore(raw, { merge, run });
-      return { status: "done", note: run ? "Scanning the ATS network for fresh roles (free)…" : "Opened Explore with your filters." };
+      return { status: "done", note: run ? "正在免费扫描 ATS 网络中的新职位…" : "已按你的筛选条件打开“探索”。" };
     },
   },
 
@@ -250,9 +251,9 @@ const ACTIONS: Record<string, ActionDef> = {
     sideEffect: "spend",
     run: (raw, ctx) => {
       const target = raw.target;
-      if (!isStr(target)) return { status: "ignored", note: "missing target" };
+      if (!isStr(target)) return { status: "ignored", note: "缺少目标" };
       const id = ctx.startJob({
-        title: isStr(raw.title) ? String(raw.title) : "Research",
+        title: isStr(raw.title) ? String(raw.title) : "调研",
         kind: "research",
         input: target,
         page: "/pipeline",
@@ -265,9 +266,9 @@ const ACTIONS: Record<string, ActionDef> = {
     sideEffect: "spend",
     run: (raw, ctx) => {
       const n = String(raw.n ?? "").trim();
-      if (!n) return { status: "ignored", note: "need an application #" };
+      if (!n) return { status: "ignored", note: "请提供申请编号" };
       const app = applicationByNumber(ctx.applications, n);
-      const id = ctx.startJob({ title: `CV PDF · ${app?.company ?? `#${n}`}`, subtitle: "tailored CV", kind: "pdf", input: n, page: `/pipeline/${n}` });
+      const id = ctx.startJob({ title: `简历 PDF · ${app?.company ?? `#${n}`}`, subtitle: "定制简历", kind: "pdf", input: n, page: `/pipeline/${n}` });
       return { status: "done", jobIds: id ? [id] : [] };
     },
   },
@@ -278,16 +279,16 @@ const ACTIONS: Record<string, ActionDef> = {
       const n = String(raw.n ?? "").trim();
       const status = String(raw.status ?? "").trim();
       const canon = CANON_STATUS.find((s) => s.toLowerCase() === status.toLowerCase());
-      if (!n || !canon) return { status: "ignored", note: "need an application # and a canonical status" };
+      if (!n || !canon) return { status: "ignored", note: "请提供申请编号和规范状态" };
       const app = applicationByNumber(ctx.applications, n);
       const label = app ? `${app.company} · ${app.role}` : `#${n}`;
       return {
         status: "confirm",
-        summary: `Mark ${label} → ${canon}?`,
+        summary: `将 ${label} 标记为「${uiLabel(canon)}」？`,
         statusChange: { n, status: canon },
         run: async () => {
           await ctx.writeStatus(n, canon);
-          return { note: `Marked #${n} as ${canon}.` };
+          return { note: `已将 #${n} 标记为「${uiLabel(canon)}」。` };
         },
       };
     },
@@ -297,9 +298,9 @@ const ACTIONS: Record<string, ActionDef> = {
     sideEffect: "none",
     run: (raw, ctx) => {
       const url = raw.url;
-      if (!isStr(url) || !/^https?:\/\//i.test(url)) return { status: "ignored", note: "need an application form URL" };
+      if (!isStr(url) || !/^https?:\/\//i.test(url)) return { status: "ignored", note: "请提供申请表链接" };
       ctx.startApply(url);
-      return { status: "done", note: "Opening the application form…" };
+      return { status: "done", note: "正在打开申请表…" };
     },
   },
 
@@ -308,9 +309,9 @@ const ACTIONS: Record<string, ActionDef> = {
     run: (raw, ctx) => {
       const field = (raw.field ?? raw.label) as unknown;
       const value = raw.value;
-      if (!isStr(field) || typeof value !== "string") return { status: "ignored", note: "need a field and a value" };
+      if (!isStr(field) || typeof value !== "string") return { status: "ignored", note: "请提供字段和值" };
       ctx.setApplyField(String(field), value);
-      return { status: "done", note: `Updated "${field}".` };
+      return { status: "done", note: `已更新“${field}”。` };
     },
   },
 
@@ -321,7 +322,7 @@ const ACTIONS: Record<string, ActionDef> = {
       if (!fact) return { status: "ignored" };
       return {
         status: "confirm",
-        summary: `Save to your profile (modes/_profile.md): "${fact}"?`,
+        summary: `将以下内容保存到个人档案（modes/_profile.md）？「${fact}」`,
         run: () => {
           ctx.rememberFact(fact);
           return {};
@@ -336,14 +337,14 @@ const ACTIONS: Record<string, ActionDef> = {
   setProfile: {
     sideEffect: "write",
     run: (raw, ctx) => {
-      if (!ctx.writeProfile) return { status: "ignored", note: "profile write unavailable here" };
+      if (!ctx.writeProfile) return { status: "ignored", note: "当前页面无法写入个人档案" };
       const p = coerceProfile(raw);
       const has = Object.values(p).some((v) => (Array.isArray(v) ? v.length : v !== undefined));
-      if (!has) return { status: "ignored", note: "nothing to save" };
-      const bits = [p.roles?.length ? `roles: ${p.roles.join(", ")}` : "", p.location ? `in ${p.location}` : "", p.compMin && p.compMax ? `comp ${p.compMin}–${p.compMax}` : ""].filter(Boolean).join(" · ");
+      if (!has) return { status: "ignored", note: "没有可保存的内容" };
+      const bits = [p.roles?.length ? `职位：${p.roles.join(", ")}` : "", p.location ? `地点：${p.location}` : "", p.compMin && p.compMax ? `薪酬：${p.compMin}–${p.compMax}` : ""].filter(Boolean).join(" · ");
       return {
         status: "confirm",
-        summary: `Save your profile?${bits ? ` (${bits})` : ""}`,
+        summary: `保存你的求职资料？${bits ? ` (${bits})` : ""}`,
         run: () => {
           const profile = ctx.writeProfile!(p as Record<string, unknown>);
           const portals = p.roles?.length && ctx.writePortals ? ctx.writePortals(p.roles, p.location ? [p.location] : undefined) : null;
@@ -354,7 +355,7 @@ const ACTIONS: Record<string, ActionDef> = {
             if (profileFailure) return portals ? `${profileFailure} Your scan targets were saved.` : profileFailure;
             return portalsFailure ? `Your profile was saved. ${portalsFailure}` : null;
           });
-          return { note: "Profile saved — your matches will sharpen.", failure };
+          return { note: "个人档案已保存，后续匹配将使用这些信息。", failure };
         },
       };
     },
@@ -367,17 +368,17 @@ const ACTIONS: Record<string, ActionDef> = {
   setPersonalization: {
     sideEffect: "write",
     run: (raw, ctx) => {
-      if (!ctx.writePersonalization) return { status: "ignored", note: "personalization write unavailable here" };
+      if (!ctx.writePersonalization) return { status: "ignored", note: "当前页面无法保存个性化设置" };
       const p = coercePersonalization(raw) as Record<string, unknown>;
       const ids = Object.keys(p);
-      if (ids.length === 0) return { status: "ignored", note: "nothing to save" };
+      if (ids.length === 0) return { status: "ignored", note: "没有可保存的内容" };
       const labels = SECTIONS.filter((s) => ids.includes(s.id)).map((s) => s.heading.replace(/^## Your /, "").toLowerCase());
       return {
         status: "confirm",
-        summary: `Save your personalization? (${labels.join(", ")})`,
+        summary: `保存个性化设置？（${labels.join("、")}）`,
         run: () => {
           ctx.writePersonalization!(p);
-          return { note: "Personalization saved — evaluations now score against YOUR targeting." };
+          return { note: "个性化设置已保存，后续评估将依据你的求职目标。" };
         },
       };
     },
@@ -386,15 +387,15 @@ const ACTIONS: Record<string, ActionDef> = {
   setPortals: {
     sideEffect: "write",
     run: (raw, ctx) => {
-      if (!ctx.writePortals) return { status: "ignored", note: "portals write unavailable here" };
+      if (!ctx.writePortals) return { status: "ignored", note: "当前页面无法保存招聘来源" };
       const roles = Array.isArray(raw.roles) ? raw.roles.filter((r): r is string => typeof r === "string" && r.trim().length > 0).map((r) => r.trim()) : [];
-      if (roles.length === 0) return { status: "ignored", note: "no roles" };
+      if (roles.length === 0) return { status: "ignored", note: "没有职位类型" };
       const location = Array.isArray(raw.location) ? raw.location.filter((l): l is string => typeof l === "string") : undefined;
       return {
         status: "confirm",
-        summary: `Set your scan targets to: ${roles.join(", ")}?`,
+        summary: `将扫描目标设为：${roles.join(", ")}?`,
         run: () => {
-          return { note: "Scan targets updated.", failure: ctx.writePortals!(roles, location) };
+          return { note: "扫描目标已更新。", failure: ctx.writePortals!(roles, location) };
         },
       };
     },
@@ -407,10 +408,10 @@ export function actionExists(id: string): boolean {
 
 export function dispatch(id: string, rawArgs: Record<string, unknown>, ctx: ActionCtx): DispatchResult {
   const def = ACTIONS[id];
-  if (!def) return { status: "ignored", note: `unknown action: ${id}` };
+  if (!def) return { status: "ignored", note: `未知操作：${id}` };
   try {
     return def.run(rawArgs ?? {}, ctx);
   } catch {
-    return { status: "ignored", note: `could not run ${id}` };
+    return { status: "ignored", note: `无法执行 ${id}` };
   }
 }

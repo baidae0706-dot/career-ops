@@ -15,13 +15,13 @@ type LoadState = { kind: "loading" } | { kind: "error"; reason: string } | { kin
 type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved"; pdf: string; indexed: boolean; warnings: string[] } | { kind: "failed"; error: string };
 
 const REASONS: Record<string, { title: string; body: string }> = {
-  "no-tailored-cv": { title: "No tailored CV yet", body: "Generate a tailored CV from the report page first. The Studio opens it for review once it exists." },
-  "unreadable-layout": { title: "This CV layout is not supported yet", body: "The Studio reads CVs built from the career-ops templates. Open the PDF from the report page instead." },
-  "no-report": { title: "Report not found", body: "There is no evaluation report with this number." },
+  "no-tailored-cv": { title: "尚无定制简历", body: "请先在报告页生成定制简历，之后即可在工作室中检查。" },
+  "unreadable-layout": { title: "暂不支持这种简历布局", body: "工作室支持使用 career-ops 模板生成的简历。请先从报告页打开 PDF。" },
+  "no-report": { title: "未找到报告", body: "没有这个编号的评估报告。" },
 };
 
-const STALE = "This CV was regenerated in another tab. Reload the Studio.";
-const SAVE_ERRORS: Record<string, string> = { stale: STALE, busy: "This CV is already being saved. Wait for that save to finish." };
+const STALE = "这份简历已在另一个标签页中重新生成，请刷新简历工作室。";
+const SAVE_ERRORS: Record<string, string> = { stale: STALE, busy: "这份简历正在保存，请等待完成。" };
 
 export function CvStudio({ n }: { n: string }) {
   const [load, setLoad] = useState<LoadState>({ kind: "loading" });
@@ -39,13 +39,13 @@ export function CvStudio({ n }: { n: string }) {
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6">
       <Link href={`/pipeline/${n}`} className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-brand">
-        <ArrowLeft className="size-4" /> Report #{n}
+        <ArrowLeft className="size-4" /> 报告编号{n}
       </Link>
-      {load.kind === "loading" && <div className="mt-6 h-[70vh] animate-pulse rounded-2xl bg-muted/15" aria-label="Loading the CV Studio" />}
+      {load.kind === "loading" && <div className="mt-6 h-[70vh] animate-pulse rounded-2xl bg-muted/15" aria-label={"正在加载简历工作室"} />}
       {load.kind === "error" && (
         <div className="mt-8 max-w-xl rounded-2xl border border-border bg-surface/40 px-6 py-5">
-          <h1 className="font-display text-xl text-landing">{REASONS[load.reason]?.title ?? "The CV Studio could not open this CV"}</h1>
-          <p className="mt-2 text-sm text-muted">{REASONS[load.reason]?.body ?? "Reload the page to try again."}</p>
+          <h1 className="font-display text-xl text-landing">{REASONS[load.reason]?.title ?? "简历工作室无法打开这份简历"}</h1>
+          <p className="mt-2 text-sm text-muted">{REASONS[load.reason]?.body ?? "请刷新页面重试。"}</p>
         </div>
       )}
       {load.kind === "ready" && <Studio n={n} data={load.data} />}
@@ -82,8 +82,8 @@ function Studio({ n, data }: { n: string; data: Loaded }) {
     setSave((s) => (s.kind === "saved" ? { kind: "idle" } : s));
     const t = setTimeout(() => {
       send("PUT", { edits })
-        .then((r) => setAutosaveError(r.ok ? null : r.status === 409 ? STALE : "Autosave failed. Your latest changes are not saved yet."))
-        .catch(() => setAutosaveError("Autosave failed. Is the dashboard still running?"));
+        .then((r) => setAutosaveError(r.ok ? null : r.status === 409 ? STALE : "自动保存失败，最新改动尚未保存。"))
+        .catch(() => setAutosaveError("自动保存失败，请检查本地服务是否仍在运行。"));
     }, 500);
     return () => clearTimeout(t);
   }, [edits, send]);
@@ -93,9 +93,9 @@ function Studio({ n, data }: { n: string; data: Loaded }) {
     try {
       const r = await send("POST", { op: "save", edits });
       const body = (await r.json()) as { pdf?: string; indexed?: boolean; warnings?: string[]; error?: string };
-      setSave(r.ok && body.pdf ? { kind: "saved", pdf: body.pdf, indexed: body.indexed === true, warnings: body.warnings ?? [] } : { kind: "failed", error: SAVE_ERRORS[body.error ?? ""] ?? body.error ?? "Saving failed." });
+      setSave(r.ok && body.pdf ? { kind: "saved", pdf: body.pdf, indexed: body.indexed === true, warnings: body.warnings ?? [] } : { kind: "failed", error: SAVE_ERRORS[body.error ?? ""] ?? body.error ?? "保存失败。" });
     } catch {
-      setSave({ kind: "failed", error: "Saving failed. Is the dashboard still running?" });
+      setSave({ kind: "failed", error: "保存失败，请检查本地服务是否仍在运行。" });
     }
   }, [edits, send]);
 
@@ -105,41 +105,41 @@ function Studio({ n, data }: { n: string; data: Loaded }) {
     <>
       <header className="mt-4 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-faint">CV Studio</p>
+          <p className="font-mono text-xs uppercase tracking-[0.18em] text-faint">简历工作室</p>
           <h1 className="mt-1 font-display text-3xl tracking-tight text-landing">{data.company}</h1>
           <p className="mt-1 text-sm text-muted">
-            {changed} {changed === 1 ? "change" : "changes"} from your base CV. Review each one, then save the version you will send.
+            {changed} {changed === 1 ? "处改动" : "处改动"} ，均相对于基础简历。请逐项检查，再保存你要发送的版本。
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Segmented label="Length" value={edits.preset.length} options={[["full", "Full"], ["one-page", "One page"]]} onChange={(v) => dispatch({ type: "preset", preset: { length: v as "full" | "one-page" } })} />
-          <Segmented label="Tone" value={edits.preset.tone} options={[["tailored", "Tailored"], ["conservative", "Conservative"]]} onChange={(v) => dispatch({ type: "preset", preset: { tone: v as "tailored" | "conservative" } })} />
+          <Segmented label={"篇幅"} value={edits.preset.length} options={[["full", "完整"], ["one-page", "一页"]]} onChange={(v) => dispatch({ type: "preset", preset: { length: v as "full" | "one-page" } })} />
+          <Segmented label={"语气"} value={edits.preset.tone} options={[["tailored", "定制版"], ["conservative", "保守"]]} onChange={(v) => dispatch({ type: "preset", preset: { tone: v as "tailored" | "conservative" } })} />
           <button onClick={() => dispatch({ type: "reset" })} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:border-brand/40 hover:text-brand">
-            <RotateCcw className="size-3.5" /> Reset
+            <RotateCcw className="size-3.5" /> 重置
           </button>
           <button
             onClick={saveForApply}
             disabled={save.kind === "saving"}
             className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-1.5 text-sm font-medium text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
           >
-            {save.kind === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Save for apply
+            {save.kind === "saving" ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} 保存供投递使用
           </button>
         </div>
       </header>
 
-      {data.stale && <Notice tone="warn">This CV was regenerated since your last visit, so earlier edits were cleared.</Notice>}
-      {!data.hasBase && <Notice tone="warn">No cv.md found, so changes cannot be compared with your base CV.</Notice>}
+      {data.stale && <Notice tone="warn">这份简历在你上次访问后重新生成过，因此先前的编辑已清除。</Notice>}
+      {!data.hasBase && <Notice tone="warn">未找到 cv.md，无法与基础简历比较改动。</Notice>}
       {save.kind === "saved" && (
         <Notice tone={save.indexed ? "ok" : "warn"}>
           {save.indexed ? (
             <>
-              Saved. Apply now uploads this version.{" "}
+              已保存，后续投递将上传这个版本。{" "}
               <a href={`/api/cv-pdf?n=${encodeURIComponent(data.reportNum)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium underline">
-                <FileText className="size-3.5" /> Open {save.pdf}
+                <FileText className="size-3.5" /> 打开 {save.pdf}
               </a>
             </>
           ) : (
-            <>Saved {save.pdf}, but data/pdf-index.tsv was not updated, so Apply still uploads the earlier PDF.</>
+            <>已保存 {save.pdf}，但 data/pdf-index.tsv 未更新，因此投递仍将上传先前的 PDF。</>
           )}
           {save.warnings.filter((w) => !/cv-facts\.json/.test(w)).map((w) => (
             <span key={w} className="mt-1 block text-xs opacity-80">{w}</span>

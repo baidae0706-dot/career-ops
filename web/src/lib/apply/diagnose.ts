@@ -17,12 +17,12 @@ export type { ApplyIssue };
 export function statusBlock(status: number | null | undefined, headers: Record<string, string>): ApplyIssue | null {
   if (!status) return null;
   const cf = headers["cf-ray"] || headers["cf-mitigated"] || headers["cf-request-id"];
-  if (status === 401 || status === 407) return { level: "block", code: "auth-required", message: "This page needs you to sign in first. Open it directly, log in, then paste the application-form URL here." };
-  if (status === 451) return { level: "block", code: "geo-block", message: "This page is blocked for legal/region reasons. We can't open the form here." };
+  if (status === 401 || status === 407) return { level: "block", code: "auth-required", message: "这个页面需要先登录。请直接打开并登录，再将申请表链接粘贴到这里。" };
+  if (status === 451) return { level: "block", code: "geo-block", message: "这个页面因法律或地区原因受限，无法在此打开申请表。" };
   if (status === 403) return { level: "block", code: cf ? "bot-block" : "forbidden", message: cf ? "This page is behind a bot check. Open it directly in your browser, then paste the URL back here." : "This page returned “403 access denied”. Open it directly in your browser to check." };
-  if (status === 429) return { level: "block", code: "rate-limited", message: "The site is rate-limiting requests right now. Wait a minute, then try again or open it directly." };
-  if (status >= 500) return { level: "block", code: "server-error", message: `The site returned an error (status ${status}). Try again shortly, or open it directly.` };
-  if (status === 404 || status === 410) return { level: "block", code: "not-found", message: "This posting is gone (404). It's likely closed, or the link is wrong." };
+  if (status === 429) return { level: "block", code: "rate-limited", message: "网站正在限制请求频率。请稍后重试，或直接打开网站。" };
+  if (status >= 500) return { level: "block", code: "server-error", message: `网站返回错误（状态码 ${status}）。请稍后重试，或直接打开网站。` };
+  if (status === 404 || status === 410) return { level: "block", code: "not-found", message: "职位页面已不存在（404），可能已经关闭，也可能是链接有误。" };
   return null;
 }
 
@@ -48,13 +48,13 @@ export async function dismissConsent(page: Page): Promise<ApplyIssue[]> {
       const b = page.locator(sel).first();
       if ((await b.count().catch(() => 0)) && (await b.isVisible().catch(() => false))) {
         await b.click({ timeout: 2000 }).catch(() => {});
-        return [{ level: "info", code: "consent-dismissed", message: "Dismissed a cookie banner to reach the form." }];
+        return [{ level: "info", code: "consent-dismissed", message: "已关闭 Cookie 提示以访问申请表。" }];
       }
     }
     const g = page.getByRole("button", { name: /^(accept|allow|agree|got it|i agree|accept all)/i }).first();
     if (await g.count().catch(() => 0)) {
       await g.click({ timeout: 2000 }).catch(() => {});
-      return [{ level: "info", code: "consent-dismissed", message: "Dismissed a cookie banner to reach the form." }];
+      return [{ level: "info", code: "consent-dismissed", message: "已关闭 Cookie 提示以访问申请表。" }];
     }
   } catch {
     /* never let consent handling break the open */
@@ -145,21 +145,21 @@ export async function classifyEmpty(page: Page, url: string): Promise<ApplyIssue
   const challUrl = /__cf_chl|challenges\.cloudflare\.com|\/cdn-cgi\/|datadome|px-captcha/.test(u);
   const challText = /(verify (you|that you)|are you human|not a robot|human verification|checking your browser|enable javascript and cookies)/.test(sig.body);
   if ([challTitle, challUrl, sig.challengeDom, challText].filter(Boolean).length >= 2) {
-    return { level: "block", code: "bot-challenge", message: "This page is asking you to verify you're human before showing the form. Open it directly in your browser, complete the check, then paste the URL back here." };
+    return { level: "block", code: "bot-challenge", message: "页面要求先验证你是真人。请在浏览器中直接打开并完成验证，再将链接粘贴到这里。" };
   }
   if (sig.hasPassword || /\/(login|sign-?in|register|sign-?up|auth|account|mfa|2fa)(\/|$|\?)/.test(u)) {
-    return { level: "block", code: "login-wall", message: "This page wants you to sign in or create an account first. Open it directly, log in, then paste the actual application-form URL here." };
+    return { level: "block", code: "login-wall", message: "页面要求先登录或注册。请直接打开并登录，再将实际申请表链接粘贴到这里。" };
   }
   if (/no longer accepting|position has been filled|posting is closed|no longer available|this (job|position|posting) (is |has )?(closed|expired|been filled)/.test(sig.body) || /not found|no longer|removed|closed/.test(sig.t)) {
-    return { level: "block", code: "expired", message: "This job posting is closed or expired — it's no longer accepting applications." };
+    return { level: "block", code: "expired", message: "这个职位已关闭或过期，不再接受申请。" };
   }
   if (/myworkdayjobs\.com$/i.test(host)) {
-    return { level: "block", code: "workday", message: "Workday forms aren't supported for in-app fill yet (multi-step, account-gated). Open the posting and apply there directly." };
+    return { level: "block", code: "workday", message: "暂不支持在应用中填写 Workday 表单（多步骤且需要账户）。请打开职位页面直接申请。" };
   }
   if (/^(jobs|careers|empleos|empregos|all jobs|open (positions|roles)|search jobs|current openings)/i.test(sig.t) || /\/(jobs|careers|search|positions)\/?(\?|$)/.test(u)) {
-    return { level: "block", code: "listing-page", message: "This looks like the careers listing, not a single application — the posting may have moved or closed. Open the specific job and paste its “Apply” URL." };
+    return { level: "block", code: "listing-page", message: "这似乎是招聘列表，而不是单个申请。职位可能已迁移或关闭，请打开具体职位并粘贴其申请链接。" };
   }
-  return { level: "block", code: "no-form", message: "Couldn't find a fillable form on this page. If it's a job description, open its “Apply” form and paste that URL." };
+  return { level: "block", code: "no-form", message: "页面上未找到可填写的表单。如果这是职位介绍，请打开其申请表并粘贴对应链接。" };
 }
 
 /** An INTERACTIVE captcha (a checkbox/widget the user must click) present on the
@@ -185,7 +185,7 @@ export async function captchaWarning(page: Page): Promise<ApplyIssue | null> {
       );
     })
     .catch(() => false);
-  return interactive ? { level: "warn", code: "captcha-present", message: "This form has a captcha you'll need to tick — do it yourself on the real form at the end." } : null;
+  return interactive ? { level: "warn", code: "captcha-present", message: "表单包含需要你勾选的验证码，请最后在真实表单中自行完成。" } : null;
 }
 
 /** Conservatively detect a multi-STEP form (we only read/fill page 1) so we can
@@ -204,7 +204,7 @@ export async function multiStepInfo(page: Page): Promise<ApplyIssue | null> {
       return (stepText || hasNext) && !hasSubmit;
     })
     .catch(() => false);
-  return ms ? { level: "info", code: "multi-step", message: "This form has more than one step — after this page, you'll continue on the real form." } : null;
+  return ms ? { level: "info", code: "multi-step", message: "这份表单不止一步，当前页面之后需要继续在真实表单中填写。" } : null;
 }
 
 /** READ THE REAL FORM BACK after filling: did every answer land? required fields
@@ -268,8 +268,8 @@ export async function verifyFill(frame: Frame, fields: ApplyField[], answers: Re
     .catch(() => ({ mismatches: [], requiredEmpty: [], valErrors: [] }) as R);
 
   const out: ApplyIssue[] = [];
-  if (res.mismatches.length) out.push({ level: "warn", code: "fill-mismatch", message: `These answers didn't seem to land on the real form — check them: ${res.mismatches.slice(0, 4).join(", ")}${res.mismatches.length > 4 ? "…" : ""}.` });
-  if (res.requiredEmpty.length) out.push({ level: "warn", code: "required-empty", message: `Required and still empty — you'll need to fill ${res.requiredEmpty.length > 1 ? "these" : "this"}: ${res.requiredEmpty.slice(0, 4).join(", ")}${res.requiredEmpty.length > 4 ? "…" : ""}.` });
-  for (const v of res.valErrors) out.push({ level: "warn", code: "validation", message: `The form flagged: “${v}”.` });
+  if (res.mismatches.length) out.push({ level: "warn", code: "fill-mismatch", message: `以下回答似乎没有成功填入真实表单，请检查：${res.mismatches.slice(0, 4).join("、")}${res.mismatches.length > 4 ? "…" : ""}。` });
+  if (res.requiredEmpty.length) out.push({ level: "warn", code: "required-empty", message: `以下必填项仍为空，需要你补充：${res.requiredEmpty.slice(0, 4).join("、")}${res.requiredEmpty.length > 4 ? "…" : ""}。` });
+  for (const v of res.valErrors) out.push({ level: "warn", code: "validation", message: `表单提示：「${v}」。` });
   return out;
 }

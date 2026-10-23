@@ -58,7 +58,7 @@ export function CompanyEvidence({ company }: { company: string }) {
     <section className="mt-8 rounded-2xl border border-border bg-surface/40 px-5 py-4">
       <div className="flex flex-wrap items-center gap-2">
         <Building2 className="size-4 text-brand" />
-        <h2 className="font-display text-base text-landing">What you already know about {model.company ?? company}</h2>
+        <h2 className="font-display text-base text-landing">你已经了解的内容： {model.company ?? company}</h2>
       </div>
 
       <div className="mt-3 grid gap-2.5">

@@ -94,7 +94,7 @@ export function parseScheduledJobInput(raw: unknown, base?: ScheduledJob): JobFi
   } catch (error) {
     throw new ScheduledJobValidationError(error instanceof Error ? error.message : "Scheduled job body must be an object.");
   }
-  const fallbackName = base?.name || "Scheduled scan";
+  const fallbackName = base?.name || "定时扫描";
   const name = String(input.name ?? fallbackName).trim().slice(0, 80) || fallbackName;
   if (input.engine !== undefined && input.engine !== "portals" && input.engine !== "full") throw new ScheduledJobValidationError("Invalid scan engine.");
   const engine: ScanEngine = input.engine === "portals" || input.engine === "full" ? input.engine : base?.engine || "full";

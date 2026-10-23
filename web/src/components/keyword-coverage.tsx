@@ -1,5 +1,6 @@
 "use client";
 
+import { uiLabel } from "@/lib/ui-labels";
 import { useEffect, useState } from "react";
 import { ScanSearch } from "lucide-react";
 import { coverageModel, coverageBand } from "@/lib/keyword-coverage.mjs";
@@ -24,12 +25,12 @@ const BAND_CLASS: Record<string, string> = {
 };
 
 const REASON_COPY: Record<string, string> = {
-  "no-keywords": "This report has no “Keywords extracted” block, so there is nothing to compare the CV against.",
-  "no-script": "keyword-match.mjs isn’t in this career-ops checkout.",
-  "no-report": "The report file couldn’t be found.",
-  failed: "The keyword check didn’t complete.",
-  unparseable: "The keyword check returned something unreadable.",
-  unavailable: "The keyword check isn’t available.",
+  "no-keywords": "这份报告没有提取关键词，暂时无法与简历比较。",
+  "no-script": "当前 career-ops 中缺少 keyword-match.mjs。",
+  "no-report": "未找到报告文件。",
+  failed: "关键词检查未完成。",
+  unparseable: "关键词检查返回了无法读取的结果。",
+  unavailable: "关键词检查暂不可用。",
 };
 
 export function KeywordCoverage({ reportId }: { reportId: string }) {
@@ -78,7 +79,7 @@ export function KeywordCoverage({ reportId }: { reportId: string }) {
           {model.coveragePct === null ? "—" : `${model.coveragePct}%`}
         </span>
         <span className="text-sm text-muted">
-          {model.presentCount} of {model.total} JD keyword{model.total === 1 ? "" : "s"} found in your CV
+          共 {model.total} 个职位关键词，其中 {model.presentCount} 个已在你的简历中找到
         </span>
       </div>
 
@@ -87,7 +88,7 @@ export function KeywordCoverage({ reportId }: { reportId: string }) {
           tier.terms.length === 0 ? null : (
             <div key={tier.key}>
               <p className="text-xs uppercase tracking-wide text-faint">
-                {tier.label} <span className="normal-case tracking-normal">· {tier.hint}</span>
+                {uiLabel(tier.label)} <span className="normal-case tracking-normal">· {uiLabel(tier.hint)}</span>
               </p>
               <ul className="mt-1.5 flex flex-wrap gap-1.5">
                 {tier.terms.map((term, i) => (
@@ -109,8 +110,7 @@ export function KeywordCoverage({ reportId }: { reportId: string }) {
       </div>
 
       <p className="mt-4 text-xs text-faint">
-        Diagnostic only — nothing here edits your CV. Reformulate what you genuinely have; never add a keyword you cannot
-        back up.
+        仅用于诊断，此处不会修改你的简历。可以调整真实经历的表述，但不要添加缺乏事实依据的关键词。
       </p>
     </section>
   );
@@ -120,8 +120,8 @@ function Header() {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <ScanSearch className="size-4 text-brand" />
-      <h2 className="font-display text-base text-landing">ATS keyword coverage</h2>
-      <span className="text-xs text-faint">this JD vs your CV</span>
+      <h2 className="font-display text-base text-landing">ATS 关键词覆盖度</h2>
+      <span className="text-xs text-faint">职位描述与简历的对比</span>
     </div>
   );
 }

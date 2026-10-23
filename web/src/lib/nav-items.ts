@@ -11,16 +11,16 @@ export type NavItem = {
 };
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Today", icon: LayoutDashboard },
-  { href: "/explore", label: "Explore", icon: Compass, chip: "New" },
-  { href: "/scheduled-scans", label: "Scheduled scans", icon: CalendarClock },
-  { href: "/pipeline", label: "Pipeline", icon: ListChecks },
-  { href: "/followups", label: "Follow-ups", icon: Send },
-  { href: "/portals", label: "Portals", icon: Radar },
-  { href: "/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/cv", label: "CV", icon: FileText },
-  { href: "/documents", label: "Documents", icon: Files },
-  { href: "/config", label: "Config", icon: Settings },
+  { href: "/", label: "今日", icon: LayoutDashboard },
+  { href: "/explore", label: "探索", icon: Compass, chip: "新" },
+  { href: "/scheduled-scans", label: "定时扫描", icon: CalendarClock },
+  { href: "/pipeline", label: "求职进展", icon: ListChecks },
+  { href: "/followups", label: "跟进", icon: Send },
+  { href: "/portals", label: "招聘门户", icon: Radar },
+  { href: "/analytics", label: "数据分析", icon: BarChart3 },
+  { href: "/cv", label: "简历", icon: FileText },
+  { href: "/documents", label: "文档", icon: Files },
+  { href: "/config", label: "设置", icon: Settings },
 ];
 
 export function visibleNavItems(followupsEnabled: boolean): NavItem[] {

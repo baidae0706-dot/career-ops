@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { FileDown, Loader2, FileText, RotateCcw, SlidersHorizontal, TriangleAlert } from "lucide-react";
 import { useJobs } from "@/components/jobs/job-store";
+import { uiLabel } from "@/lib/ui-labels";
 import { CostBadge } from "@/components/cost/cost-badge";
 import { pdfButtonState, type PdfFailure } from "@/lib/pdf-button-state.mjs";
 
@@ -18,14 +19,14 @@ export function GeneratePdfButton({ n, company, pdfReady }: { n: string; company
     [jobs, n],
   );
   const generate = () =>
-    startJob({ title: `CV PDF · ${company}`, subtitle: "tailored for this role", kind: "pdf", input: n, page: `/pipeline/${n}` });
+    startJob({ title: `简历 PDF · ${company}`, subtitle: "针对此岗位定制", kind: "pdf", input: n, page: `/pipeline/${n}` });
 
   const state = pdfButtonState(job, pdfReady);
 
   if (state.kind === "running")
     return (
       <Link href={`/jobs/${state.jobId}`} className="inline-flex items-center justify-center gap-1.5 rounded-full border border-brand/40 bg-brand-soft px-3 py-1 text-xs font-medium text-brand max-sm:min-h-[44px]">
-        <Loader2 className="size-3.5 animate-spin" /> Generating CV…
+        <Loader2 className="size-3.5 animate-spin" /> 正在生成简历…
       </Link>
     );
 
@@ -38,17 +39,17 @@ export function GeneratePdfButton({ n, company, pdfReady }: { n: string; company
           rel="noreferrer"
           className="inline-flex items-center justify-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-500/15 dark:text-emerald-400 max-sm:min-h-[44px]"
         >
-          <FileText className="size-3.5" /> View tailored CV
+          <FileText className="size-3.5" /> 查看定制简历
         </a>
         <Link
           href={`/pipeline/${encodeURIComponent(n)}/cv-studio`}
           className="inline-flex items-center justify-center gap-1.5 rounded-full border border-brand/40 bg-brand-soft px-3 py-1 text-xs font-medium text-brand transition-colors hover:bg-brand-soft/70 max-sm:min-h-[44px]"
         >
-          <SlidersHorizontal className="size-3.5" /> Review and customize
+          <SlidersHorizontal className="size-3.5" /> 检查并自定义
         </Link>
         <button
           onClick={generate}
-          title="Regenerate the tailored CV"
+          title="重新生成定制简历"
           className="inline-flex items-center justify-center rounded-full p-1 text-faint transition-colors hover:text-brand max-sm:min-h-[44px] max-sm:min-w-[44px]"
         >
           <RotateCcw className="size-3" />
@@ -65,10 +66,9 @@ export function GeneratePdfButton({ n, company, pdfReady }: { n: string; company
       <button
         onClick={generate}
         className="inline-flex items-center justify-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted transition-colors hover:border-brand/40 hover:text-brand max-sm:min-h-[44px]"
-        title="Generate an ATS-optimized CV tailored to this role"
+        title="为此岗位生成适合 ATS 解析的定制简历"
       >
-        <FileDown className="size-3.5" /> Generate tailored CV (PDF)
-      </button>
+        <FileDown className="size-3.5" />{"生成定制简历（PDF）"}</button>
       <CostBadge kind="spend" size="xs" />
       <FailureNote failure={state.failure} />
     </span>
@@ -81,11 +81,11 @@ function FailureNote({ failure }: { failure: PdfFailure }) {
     <Link
       href={`/jobs/${failure.jobId}`}
       role="alert"
-      title="Open the run log"
+      title="打开运行日志"
       className="inline-flex max-w-md items-start gap-1 text-xs text-red-700 hover:underline dark:text-red-400"
     >
       <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-      <span>CV not generated. {failure.reason}</span>
+      <span>简历未生成。 {uiLabel(failure.reason)}</span>
     </Link>
   );
 }

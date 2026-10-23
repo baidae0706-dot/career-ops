@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ApplyLoading() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8" aria-label="Loading apply checklist">
+    <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8" aria-label={"正在加载投递清单"}>
       <Skeleton className="h-4 w-28" />
       <Skeleton className="mt-5 h-3 w-24" />
       <Skeleton className="mt-3 h-10 w-64 max-w-[70%]" />

@@ -7,23 +7,23 @@ export function workerIdentity(job) {
 
 /** @param {string} status */
 export function workerState(status) {
-  return status === "done" ? "Completed" : status === "error" ? "Failed" : "Running";
+  return status === "done" ? "已完成" : status === "error" ? "失败" : "运行中";
 }
 
 /** Stable during timer/tool updates; includes the visible task identity. @param {Worker} job */
 export function workerDetailsLabel(job) {
-  return `Open worker: ${workerIdentity(job)} — ${workerState(job.status)}`;
+  return `打开任务：${workerIdentity(job)} — ${workerState(job.status)}`;
 }
 
 /** @param {Worker[]} jobs @param {number} total */
 export function workerBatchSummary(jobs, total = jobs.length) {
   const counts = [
-    ["running", jobs.filter((j) => j.status === "running").length],
-    ["completed", jobs.filter((j) => j.status === "done").length],
-    ["failed", jobs.filter((j) => j.status === "error").length],
-    ["unavailable", Math.max(0, total - jobs.length)],
+    ["运行中", jobs.filter((j) => j.status === "running").length],
+    ["已完成", jobs.filter((j) => j.status === "done").length],
+    ["失败", jobs.filter((j) => j.status === "error").length],
+    ["不可用", Math.max(0, total - jobs.length)],
   ];
-  return counts.filter(([, count]) => count).map(([state, count]) => `${count} ${state}`).join(", ");
+  return counts.filter(([, count]) => count).map(([state, count]) => `${count} 项${state}`).join("，");
 }
 
 /**
@@ -57,8 +57,8 @@ export function createWorkerFeedback(publish, { schedule = setTimeout, cancel = 
         pending = [];
         timer = undefined;
         publish(batch.length <= 3
-          ? batch.map((j) => `${workerIdentity(j)}: ${workerState(j.status).toLowerCase()}.`).join(" ")
-          : `${batch.length} workers: ${workerBatchSummary(batch)}. Open Worker history for details.`);
+          ? batch.map((j) => `${workerIdentity(j)}：${workerState(j.status)}。`).join(" ")
+          : `${batch.length} 项任务：${workerBatchSummary(batch)}。打开任务历史查看详情。`);
       }, delay);
     },
     dispose() {

@@ -193,7 +193,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
     setPartial(false);
     setError("");
     setScannerMissing(false);
-    setStatus("Casting the net across the ATS network…");
+    setStatus("正在搜索 ATS 招聘网络…");
     const init: Partial<Record<DiscoverySource, SourceState>> = {};
     for (const a of employer ? f.employers ?? [] : f.ats) init[a] = { state: "queued" };
     setSources(init);
@@ -216,7 +216,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
       switch (ev.kind) {
         case "atsStart":
           setPhase("scanning");
-          setStatus(`Walking ${ATS_LABEL[ev.ats as AtsSource] ?? ev.ats} — ${ev.companies.toLocaleString()} companies`);
+          setStatus(`正在扫描 ${ATS_LABEL[ev.ats as AtsSource] ?? ev.ats} — ${ev.companies.toLocaleString()} 家公司`);
           setSources((s) => ({ ...s, [ev.ats]: { ...s[ev.ats as AtsSource], state: "active", companies: ev.companies } }));
           break;
         case "progress":
@@ -280,16 +280,16 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
           typeof msg === "string" && msg
             ? msg
             : sawScannerMissing
-              ? "The scanner isn't available."
+              ? "扫描器不可用。"
               : `Discovery failed (${status}).`;
       }
     } catch (e) {
       aborted = isAbortError(e);
       sawError = aborted
-        ? "Discover was interrupted before it finished. Run it again."
+        ? "职位发现尚未完成便已中断，请重新运行。"
         : e instanceof Error
           ? e.message
-          : "stream error";
+          : "数据流错误";
     }
 
     // The run has settled, so the URL can carry the search again (shareable, and
@@ -300,7 +300,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
     if (employer) {
       runningRef.current = false;
       // A missing terminal summary is interruption, even with zero results.
-      const outcome: EmployerScanOutcome = employerResult ?? { state: acc.length ? "partial" : "failed", message: `Incomplete scan — ${(f.employers ?? []).map(id => EMPLOYER_LABEL[id]).join(", ")}: ${sawError || "source stream ended before completion"}.` };
+      const outcome: EmployerScanOutcome = employerResult ?? { state: acc.length ? "partial" : "failed", message: `扫描未完成 — ${(f.employers ?? []).map(id => EMPLOYER_LABEL[id]).join("、")}：${sawError || "来源数据流在完成前结束"}。` };
       setEmployerOutcome(outcome);
       setStatus("");
       setPartial(outcome.state !== "complete");
@@ -328,7 +328,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
       }
       setMatchCount(acc.length);
       setPhase("revealing");
-      setStatus(`${acc.length} fresh role${acc.length === 1 ? "" : "s"} found — free.`);
+      setStatus(`找到 ${acc.length} 个新职位 — 免费。`);
       window.setTimeout(() => {
         if (runs.current.owns(run)) setPhase("results");
       }, 850);
@@ -356,7 +356,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
     const run = runs.current.start();
     runningRef.current = true;
     setPhase("casting");
-    setStatus("Loading fresh matches…");
+    setStatus("正在加载新的匹配职位…");
     setEmployerOutcome(null);
     setOffers([]);
     setMatchCount(0);
@@ -374,14 +374,14 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
       const r = await fetch(`/api/whats-new?limit=${MAX_OFFER_LIMIT}`);
       if (!runs.current.owns(run)) return;
       if (!r.ok) {
-        setError(`Couldn't load fresh matches (${r.status}).`);
+        setError(`无法加载新匹配（${r.status}).`);
         setPhase("failed");
         return;
       }
       const d = await r.json().catch(() => null);
       if (!runs.current.owns(run)) return;
       if (!d || !Array.isArray(d.offers)) {
-        setError("Couldn't load fresh matches — unexpected response.");
+        setError("无法加载新匹配，响应格式异常。");
         setPhase("failed");
         return;
       }
@@ -392,7 +392,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
       setPhase(list.length > 0 ? "results" : "empty-current");
     } catch (e) {
       if (!runs.current.owns(run)) return;
-      setError(e instanceof Error ? e.message : "Couldn't load fresh matches.");
+      setError(e instanceof Error ? e.message : "无法加载新的匹配职位。");
       setPhase("failed");
     } finally {
       if (runs.current.owns(run)) runningRef.current = false;
@@ -487,7 +487,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
     setAiCost({ searches: 0, candidates: 0, fetches: 0 });
     setError("");
     setScannerMissing(false);
-    setStatus("Casting across the open web…");
+    setStatus("正在搜索公开网络…");
     // Same as the scan path: do not replaceState while /api/explore/ai is in
     // flight. The URL is written once the hunt has settled.
 
@@ -541,9 +541,9 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
         sawScannerMissing = isScannerMissing(d);
-        sawError = d.error || (sawScannerMissing ? "AI search isn't available." : `AI search failed (${r.status}).`);
+        sawError = d.error || (sawScannerMissing ? "AI 搜索不可用。" : `AI 搜索失败（${r.status}).`);
       } else if (!r.body) {
-        sawError = "No response stream.";
+        sawError = "没有响应数据流。";
       } else {
         const reader = r.body.getReader();
         const dec = new TextDecoder();
@@ -556,7 +556,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (e) {
       aborted = isAbortError(e);
-      if (!aborted) sawError = e instanceof Error ? e.message : "stream error";
+      if (!aborted) sawError = e instanceof Error ? e.message : "数据流错误";
     }
 
     if (!runs.current.owns(run)) return;
@@ -565,7 +565,7 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
     if (acc.length > 0) {
       setMatchCount(acc.length);
       setPhase("revealing");
-      setStatus(`${acc.length} candidate${acc.length === 1 ? "" : "s"} found.`);
+      setStatus(`找到 ${acc.length} 个候选职位。`);
       window.setTimeout(() => {
         if (runs.current.owns(run)) setPhase("results");
       }, 850);

@@ -24,16 +24,16 @@ export function CvPreview({ html }: { html: string }) {
   };
 
   return (
-    <section aria-label="Live preview" className="rounded-2xl border border-border bg-surface/40 p-3">
+    <section aria-label={"实时预览"} className="rounded-2xl border border-border bg-surface/40 p-3">
       <div className="mb-2 flex items-center justify-between px-1 text-xs text-muted">
-        <span>Live preview</span>
-        <span>{Math.max(1, Math.ceil(height / 1056))} page{height > 1056 ? "s" : ""} (estimate)</span>
+        <span>实时预览</span>
+        <span>{Math.max(1, Math.ceil(height / 1056))} 页（估算）</span>
       </div>
       <div ref={box} className="max-h-[80vh] overflow-auto rounded-lg bg-white shadow-sm">
         <div style={{ height: height * scale }}>
           <iframe
             ref={frame}
-            title="Tailored CV preview"
+            title={"定制简历预览"}
             srcDoc={html}
             onLoad={measure}
             sandbox="allow-same-origin"

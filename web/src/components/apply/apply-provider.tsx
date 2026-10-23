@@ -111,7 +111,7 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
       const r = await fetch("/api/apply/drive", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: id, cliId: cliId(), goal: "reach" }) });
       if (generation.current !== gen) return; // left mid-drive
       if (!r.body) {
-        setError("The agent couldn't start.");
+        setError("无法启动 AI 代理。");
         setStatus("error");
         return;
       }
@@ -144,19 +144,19 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
             setStatus("ready"); // → the ready-effect auto-prefills if pending
           } else if (ev.t === "error") {
             finished = true;
-            setError(ev.message || "The agent couldn't reach a fillable form.");
+            setError(ev.message || "AI 代理无法找到可填写的表单。");
             setStatus("error");
           }
         }
       }
       if (generation.current !== gen) return; // left mid-drive
       if (!finished) {
-        setError("The agent stopped before reaching a form.");
+        setError("AI 代理尚未到达表单就停止了。");
         setStatus("error");
       }
     } catch (e) {
       if (generation.current !== gen) return; // left mid-drive
-      setError(`The agent couldn't reach the form: ${e instanceof Error ? e.message : "stream error"}.`);
+      setError(`AI 代理无法到达表单：${e instanceof Error ? e.message : "数据流错误"}.`);
       setStatus("error");
     }
   }, []);
@@ -215,7 +215,7 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
       setStatus("ready");
     } catch {
       if (generation.current !== gen) return; // left while it was opening
-      setError("Could not open the form.");
+      setError("无法打开表单。");
       setStatus("error");
     }
   }, []);
@@ -224,7 +224,7 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
     if (!sessionId.current) return;
     const gen = generation.current;
     if (!cliId()) {
-      setError("Configure a CLI in Config first, then pre-fill from your CV.");
+      setError("请先在“设置”中配置 CLI，再根据简历预填。");
       return;
     }
     setStatus("prefilling");
@@ -246,7 +246,7 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
       const r = await fetch("/api/apply/prefill", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: sessionId.current, cliId: cliId(), company: companyRef.current, application: nRef.current }) });
       if (generation.current !== gen) return; // left mid-prefill
       if (!r.body) {
-        setError("Couldn't pre-fill — no response stream.");
+        setError("无法预填：没有响应数据流。");
         setStatus("ready");
         return;
       }
@@ -276,21 +276,21 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
           } else if (ev.t === "done") {
             got = true;
             applyAnswers(ev.answers ?? {});
-            if ((ev.count ?? 0) === 0) setError("The planner returned 0 answers — see the diagnostics log below.");
-            else if (ev.truncated) setError("The planner was cut off — some fields were recovered, others may be blank. See diagnostics.");
+            if ((ev.count ?? 0) === 0) setError("规划器没有返回答案，请查看下方诊断日志。");
+            else if (ev.truncated) setError("规划器提前中断；已恢复部分字段，其余可能为空。请查看诊断信息。");
           } else if (ev.t === "error") {
             sawError = true;
-            setError(ev.m ? `Couldn't pre-fill: ${ev.m}` : "Couldn't pre-fill from your CV.");
-            setPrefillLog((p) => [...p, `✗ ${ev.m ?? "error"}${ev.raw ? ` — raw tail: ${ev.raw.slice(0, 160)}` : ""}`]);
+            setError(ev.m ? `无法预填：${ev.m}` : "无法根据简历预填。");
+            setPrefillLog((p) => [...p, `✗ ${ev.m ?? "error"}${ev.raw ? ` — 原始输出末尾：${ev.raw.slice(0, 160)}` : ""}`]);
           }
         }
       }
       if (generation.current !== gen) return; // left mid-prefill
-      if (!got && !sawError) setError("Pre-fill ended without answers — see the diagnostics log below.");
+      if (!got && !sawError) setError("预填结束但没有答案，请查看下方诊断日志。");
       setStatus("ready");
     } catch (e) {
       if (generation.current !== gen) return; // left mid-prefill
-      setError(`Couldn't pre-fill from your CV: ${e instanceof Error ? e.message : "stream error"}. See diagnostics.`);
+      setError(`无法根据简历预填：${e instanceof Error ? e.message : "数据流错误"}。请查看诊断信息。`);
       setStatus("ready");
     }
   }, []);
@@ -337,7 +337,7 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
           return [...prev, ...(d.issues as ApplyIssue[]).filter((i) => !seen.has(i.message))];
         });
       }
-      if (d.navigated) setError("Heads up: the form's page changed during fill — review it carefully before submitting (career-ops never submits for you).");
+      if (d.navigated) setError("提醒：填写过程中表单页面发生变化，提交前请仔细检查（career-ops 不会代你提交）。");
       setStatus("done");
       // ESCALATION ("si no va, full agente"): if deterministic fill clearly
       // didn't land (most fields failed / mismatched), let the agent fill it.
@@ -349,7 +349,7 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {
       if (generation.current !== gen) return; // left mid-fill
-      setError("Fill failed.");
+      setError("填写失败。");
       setStatus("error");
     }
   }, [answers, fields]);
@@ -383,7 +383,7 @@ export function ApplyProvider({ children }: { children: React.ReactNode }) {
       setStatus(outcome.status);
     } catch (e) {
       if (controller.signal.aborted || generation.current !== gen) return; // left mid-fill
-      setError(`The agent couldn't fill the form: ${e instanceof Error ? e.message : "stream error"}. Check the real form before trying again.`);
+      setError(`AI 代理无法填写表单：${e instanceof Error ? e.message : "数据流错误"}。重试前请检查真实表单。`);
       setStatus("ready");
     }
   }, []);

@@ -1,5 +1,6 @@
 "use client";
 
+import { uiLabel } from "@/lib/ui-labels";
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Eye, EyeOff, Loader2, Pencil, Plus, Sparkles, TriangleAlert, Undo2 } from "lucide-react";
 import { readSavedCliId } from "@/lib/saved-cli";
@@ -18,10 +19,10 @@ const iconButton = "inline-flex size-7 items-center justify-center rounded-md te
 function MoveButtons({ parent, id, siblings, first, last, dispatch, label }: { parent: string; id: string; siblings: string[]; first: boolean; last: boolean; dispatch: Dispatch; label: string }) {
   return (
     <>
-      <button className={iconButton} disabled={first} aria-label={`Move ${label} up`} onClick={() => dispatch({ type: "move", parent, id, by: -1, siblings })}>
+      <button className={iconButton} disabled={first} aria-label={`上移${label}`} onClick={() => dispatch({ type: "move", parent, id, by: -1, siblings })}>
         <ArrowUp className="size-3.5" />
       </button>
-      <button className={iconButton} disabled={last} aria-label={`Move ${label} down`} onClick={() => dispatch({ type: "move", parent, id, by: 1, siblings })}>
+      <button className={iconButton} disabled={last} aria-label={`下移${label}`} onClick={() => dispatch({ type: "move", parent, id, by: 1, siblings })}>
         <ArrowDown className="size-3.5" />
       </button>
     </>
@@ -30,7 +31,7 @@ function MoveButtons({ parent, id, siblings, first, last, dispatch, label }: { p
 
 function HideButton({ id, hidden, dispatch, label }: { id: string; hidden: boolean; dispatch: Dispatch; label: string }) {
   return (
-    <button className={iconButton} aria-label={hidden ? `Show ${label}` : `Hide ${label}`} aria-pressed={hidden} onClick={() => dispatch({ type: "toggle", id })}>
+    <button className={iconButton} aria-label={hidden ? `显示${label}` : `隐藏${label}`} aria-pressed={hidden} onClick={() => dispatch({ type: "toggle", id })}>
       {hidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
     </button>
   );
@@ -43,9 +44,9 @@ export function SectionCard({ section, siblings, first, last, ...common }: Commo
   return (
     <section aria-label={section.title} className={cn("rounded-2xl border border-border bg-surface/40 px-4 py-3 transition-opacity", isHidden && "opacity-50")}>
       <header className="flex items-center gap-1">
-        <h2 className="flex-1 font-mono text-xs uppercase tracking-[0.16em] text-faint">{section.title || "Section"}</h2>
-        <MoveButtons parent="root" id={section.id} siblings={siblings} first={first} last={last} dispatch={dispatch} label={`${section.title} section`} />
-        <HideButton id={section.id} hidden={isHidden} dispatch={dispatch} label={`${section.title} section`} />
+        <h2 className="flex-1 font-mono text-xs uppercase tracking-[0.16em] text-faint">{section.title || "章节"}</h2>
+        <MoveButtons parent="root" id={section.id} siblings={siblings} first={first} last={last} dispatch={dispatch} label={`${section.title}章节`} />
+        <HideButton id={section.id} hidden={isHidden} dispatch={dispatch} label={`${section.title}章节`} />
       </header>
       {!isHidden && section.kind === "competencies" && (
         <div className="mt-2 flex flex-wrap gap-1.5">
@@ -96,18 +97,18 @@ function ItemBlock({ item, section, siblings, first, last, ...common }: Common &
             restored.includes(idx) ? (
               <li key={`r${idx}`} className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm">
                 <span className="flex-1 text-foreground">{r.text}</span>
-                <button className={iconButton} aria-label="Remove the added-back bullet" onClick={() => dispatch({ type: "unrestore", item: item.id, index: idx })}>
+                <button className={iconButton} aria-label={"移除补回的要点"} onClick={() => dispatch({ type: "unrestore", item: item.id, index: idx })}>
                   <Undo2 className="size-3.5" />
                 </button>
               </li>
             ) : (
               <li key={`r${idx}`} className="flex items-start gap-2 rounded-lg border border-dashed border-border px-3 py-2 text-sm text-faint">
                 <span className="flex-1">
-                  <span className="mr-1.5 text-[10px] font-medium uppercase tracking-wide">Dropped by the tailor</span>
+                  <span className="mr-1.5 text-[10px] font-medium uppercase tracking-wide">定制时删除的要点</span>
                   {r.text}
                 </span>
                 <button className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-muted hover:border-brand/40 hover:text-brand" onClick={() => dispatch({ type: "restore", item: item.id, index: idx })}>
-                  <Plus className="size-3" /> Add back
+                  <Plus className="size-3" /> 补回
                 </button>
               </li>
             ),
@@ -152,15 +153,15 @@ function BulletRow({ n, bullet, parent, siblings, first, last, movable, edits, h
               if (e.key === "Escape") setEditing(false);
             }}
             rows={3}
-            aria-label="Edit bullet"
+            aria-label={"编辑要点"}
             className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:border-brand focus:outline-none"
           />
           <div className="mt-1.5 flex gap-2">
             <button disabled={busy} onClick={saveDraft} className="rounded-full bg-brand px-3 py-0.5 text-xs font-medium text-brand-foreground disabled:opacity-60">
-              Use this wording
+              使用此表述
             </button>
             <button onClick={() => setEditing(false)} className="rounded-full px-3 py-0.5 text-xs text-muted hover:text-foreground">
-              Cancel
+              取消
             </button>
           </div>
         </div>
@@ -171,25 +172,25 @@ function BulletRow({ n, bullet, parent, siblings, first, last, movable, edits, h
       )}
       {!editing && shown.source === "tailored" && bullet.change === "edited" && bullet.base !== null && bullet.similarity < REWRITE_FLOOR && (
         <p className="mt-1 text-xs text-faint">
-          <span className="font-medium uppercase tracking-wide">Rewritten from</span> {bullet.base}
+          <span className="font-medium uppercase tracking-wide">原文</span> {bullet.base}
         </p>
       )}
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
         {bullet.change === "new" && shown.source === "tailored" && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-700 dark:text-amber-300" title="No matching bullet in cv.md. Make sure it is true before you send it.">
-            <TriangleAlert className="size-3" /> Not in your base CV
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-700 dark:text-amber-300" title={"cv.md 中没有匹配的要点。发送前请确认内容真实。"}>
+            <TriangleAlert className="size-3" /> 基础简历中没有此内容
           </span>
         )}
         {shown.source === "tailored" &&
           bullet.drivenBy.map((k) => (
-            <span key={k} className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] text-brand" title="Job keyword this rewrite added">
+            <span key={k} className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] text-brand" title={"本次改写新增的职位关键词"}>
               +{k}
             </span>
           ))}
-        {shown.source === "custom" && <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[11px] text-muted">Your wording</span>}
+        {shown.source === "custom" && <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[11px] text-muted">你的表述</span>}
         <span className="flex-1" />
         {bullet.base !== null && bullet.change !== "same" && (
-          <div role="radiogroup" aria-label="Wording" className="inline-flex rounded-full border border-border p-0.5 text-[11px]">
+          <div role="radiogroup" aria-label={"表述"} className="inline-flex rounded-full border border-border p-0.5 text-[11px]">
             {(["tailored", "base"] as const).map((kind) => (
               <button
                 key={kind}
@@ -198,17 +199,17 @@ function BulletRow({ n, bullet, parent, siblings, first, last, movable, edits, h
                 onClick={() => dispatch({ type: "use", id: bullet.id, use: { kind } })}
                 className={cn("rounded-full px-2 py-0.5 transition-colors", shown.source === kind ? "bg-brand-soft font-medium text-brand" : "text-muted hover:text-foreground")}
               >
-                {kind === "tailored" ? "Tailored" : "Original"}
+                {kind === "tailored" ? "定制版" : "原文"}
               </button>
             ))}
           </div>
         )}
-        <button className={iconButton} aria-label="Rewrite with AI" aria-expanded={rewriting} onClick={() => setRewriting((v) => !v)}>
+        <button className={iconButton} aria-label={"用 AI 改写"} aria-expanded={rewriting} onClick={() => setRewriting((v) => !v)}>
           <Sparkles className="size-3.5" />
         </button>
         <button
           className={iconButton}
-          aria-label="Edit wording"
+          aria-label={"编辑表述"}
           onClick={() => {
             setDraft(shown.text);
             setEditing(true);
@@ -216,8 +217,8 @@ function BulletRow({ n, bullet, parent, siblings, first, last, movable, edits, h
         >
           <Pencil className="size-3.5" />
         </button>
-        {movable && <MoveButtons parent={parent} id={bullet.id} siblings={siblings} first={first} last={last} dispatch={dispatch} label="bullet" />}
-        {movable && <HideButton id={bullet.id} hidden={isHidden} dispatch={dispatch} label="bullet" />}
+        {movable && <MoveButtons parent={parent} id={bullet.id} siblings={siblings} first={first} last={last} dispatch={dispatch} label="要点" />}
+        {movable && <HideButton id={bullet.id} hidden={isHidden} dispatch={dispatch} label="要点" />}
       </div>
       {rewriting && <RewritePanel n={n} bullet={bullet} current={shown.text} onUse={(text, keywords) => { dispatch({ type: "use", id: bullet.id, use: { kind: "custom", text, keywords } }); setRewriting(false); }} />}
     </li>
@@ -233,14 +234,14 @@ function RewritePanel({ n, bullet, current, onUse }: { n: string; bullet: Studio
   const run = async (text: string) => {
     if (proposal.kind === "running") return;
     const cliId = readSavedCliId();
-    if (!cliId) return setProposal({ kind: "failed", error: "No AI CLI is set up. Choose one in Config, or edit the wording by hand." });
+    if (!cliId) return setProposal({ kind: "failed", error: "尚未配置 AI CLI，请在配置页中选择，或手动编辑表述。" });
     setProposal({ kind: "running" });
     try {
       const r = await fetch(`/api/cv-studio/${encodeURIComponent(n)}/rewrite`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bulletId: bullet.id, instruction: text, cliId }) });
       const body = (await r.json()) as { text?: string; keywords?: string[]; warning?: string | null; error?: string };
-      setProposal(r.ok && body.text ? { kind: "ready", text: body.text, keywords: body.keywords ?? [], warning: body.warning ?? null } : { kind: "failed", error: body.error ?? "The rewrite failed." });
+      setProposal(r.ok && body.text ? { kind: "ready", text: body.text, keywords: body.keywords ?? [], warning: body.warning ?? null } : { kind: "failed", error: body.error ?? "改写失败。" });
     } catch {
-      setProposal({ kind: "failed", error: "The rewrite failed. Is the dashboard still running?" });
+      setProposal({ kind: "failed", error: "改写失败，请检查本地服务是否仍在运行。" });
     }
   };
   return (
@@ -256,32 +257,32 @@ function RewritePanel({ n, bullet, current, onUse }: { n: string; bullet: Studio
           value={instruction}
           onChange={(e) => setInstruction(e.target.value)}
           maxLength={300}
-          placeholder="How should this bullet change?"
-          aria-label="Rewrite instruction"
+          placeholder={"这个要点需要怎样修改？"}
+          aria-label={"改写要求"}
           className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground focus:border-brand focus:outline-none"
         />
         <button type="submit" disabled={proposal.kind === "running" || !instruction.trim()} className="inline-flex items-center gap-1 rounded-full bg-brand px-3 py-1 text-xs font-medium text-brand-foreground disabled:opacity-50">
-          {proposal.kind === "running" ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />} Rewrite
+          {proposal.kind === "running" ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />} 改写
         </button>
       </form>
       <div className="mt-1.5 flex flex-wrap gap-1">
         {QUICK.map((q) => (
           <button key={q} type="button" disabled={proposal.kind === "running"} onClick={() => { setInstruction(q); run(q); }} className="rounded-full border border-border bg-background px-2 py-0.5 text-[11px] text-muted hover:border-brand/40 hover:text-brand disabled:opacity-50">
-            {q}
+            {uiLabel(q)}
           </button>
         ))}
       </div>
-      {proposal.kind === "running" && <p className="mt-2 text-xs text-muted">Your AI CLI is drafting a rewrite. This uses tokens and can take a minute.</p>}
+      {proposal.kind === "running" && <p className="mt-2 text-xs text-muted">你的 AI CLI 正在起草改写。这会消耗额度，可能需要一分钟。</p>}
       {proposal.kind === "failed" && <p role="alert" className="mt-2 text-xs text-red-700 dark:text-red-300">{proposal.error}</p>}
       {proposal.kind === "ready" && (
         <div className="mt-2 rounded-md border border-border bg-background p-2 text-sm">
-          <p className="leading-relaxed text-foreground" aria-label="Suggested rewrite">
+          <p className="leading-relaxed text-foreground" aria-label={"改写建议"}>
             <Diff before={current} after={proposal.text} />
           </p>
-          {proposal.warning && <p role="status" className="mt-1.5 text-xs text-amber-800 dark:text-amber-300">{proposal.warning}. It could read or change files while drafting this.</p>}
+          {proposal.warning && <p role="status" className="mt-1.5 text-xs text-amber-800 dark:text-amber-300">{proposal.warning}。起草过程中，它可能读取或修改文件。</p>}
           <div className="mt-1.5 flex gap-2">
-            <button onClick={() => onUse(proposal.text, proposal.keywords)} className="rounded-full bg-brand px-3 py-0.5 text-xs font-medium text-brand-foreground">Accept</button>
-            <button onClick={() => setProposal({ kind: "idle" })} className="rounded-full px-3 py-0.5 text-xs text-muted hover:text-foreground">Reject</button>
+            <button onClick={() => onUse(proposal.text, proposal.keywords)} className="rounded-full bg-brand px-3 py-0.5 text-xs font-medium text-brand-foreground">采用</button>
+            <button onClick={() => setProposal({ kind: "idle" })} className="rounded-full px-3 py-0.5 text-xs text-muted hover:text-foreground">拒绝</button>
           </div>
         </div>
       )}

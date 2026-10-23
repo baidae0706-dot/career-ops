@@ -82,7 +82,7 @@ test("AbortError is classified as interrupted, not assigned as a scan failure", 
     /catch \(e\) \{\s*sawError = e instanceof Error/,
     "the catch must not treat AbortError as a failed scan",
   );
-  assert.match(callbackBody("discover"), /aborted\s*\?\s*"Discover was interrupted/);
+  assert.match(callbackBody("discover"), /aborted\s*\?\s*"职位发现尚未完成便已中断/);
   assert.doesNotMatch(provider, /saved matches/i, "an interrupted Discover saved nothing: do not send the user to look for it");
 });
 

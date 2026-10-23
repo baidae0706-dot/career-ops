@@ -47,11 +47,11 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   return (
     <PageFrame>
       <Link href="/pipeline?tab=all" className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-brand">
-        <ArrowLeft className="size-4" /> Pipeline
+        <ArrowLeft className="size-4" /> 求职进展
       </Link>
-      <h1 className="mt-5 font-display text-2xl tracking-tight text-landing">Compare</h1>
+      <h1 className="mt-5 font-display text-2xl tracking-tight text-landing">对比</h1>
       {columns.length < 2 ? (
-        <p className="mt-4 text-sm text-muted">Select two or three applications in the Pipeline to compare them.</p>
+        <p className="mt-4 text-sm text-muted">请在求职进展中选择两到三条申请进行对比。</p>
       ) : (
         <div className="mt-6 overflow-x-auto rounded-2xl border border-border">
           <table className="w-full min-w-[40rem] table-fixed text-sm">
@@ -71,7 +71,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
             </thead>
             <tbody className="divide-y divide-border align-top">
               <tr>
-                <th scope="row" className="px-4 py-2.5 text-left text-xs font-medium text-faint">Score</th>
+                <th scope="row" className="px-4 py-2.5 text-left text-xs font-medium text-faint">评分</th>
                 {columns.map((c) => (
                   <td key={c.n} className="px-4 py-2.5">
                     {c.score && <Badge tone={scoreTone(c.score)}>{c.score}</Badge>}
@@ -79,7 +79,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
                 ))}
               </tr>
               <tr>
-                <th scope="row" className="px-4 py-2.5 text-left text-xs font-medium text-faint">Legitimacy</th>
+                <th scope="row" className="px-4 py-2.5 text-left text-xs font-medium text-faint">可信度</th>
                 {columns.map((c) => (
                   <td key={c.n} className="px-4 py-2.5">
                     {c.legitimacy && <Badge tone={legitimacyTone(c.legitimacy)}>{c.legitimacy}</Badge>}

@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CvStudioLoading() {
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6" aria-label="Loading the CV Studio">
+    <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6" aria-label={"正在加载简历工作室"}>
       <Skeleton className="h-4 w-24" />
       <Skeleton className="mt-5 h-3 w-16" />
       <Skeleton className="mt-2 h-9 w-56" />

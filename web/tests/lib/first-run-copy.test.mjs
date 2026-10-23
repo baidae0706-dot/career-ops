@@ -8,8 +8,9 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
 test("first-run home does not claim no setup", () => {
   const src = readFileSync(join(root, "src/components/home/first-run-home.tsx"), "utf8");
-  assert.doesNotMatch(src, /No setup/);
-  assert.match(src, /PDF needs an AI CLI/);
+  assert.doesNotMatch(src, /No setup|无需设置/);
+  assert.match(src, /读取 PDF 需先在/);
+  assert.match(src, /中连接 AI CLI/);
 });
 
 test("pasted CV text can start without a CLI", () => {

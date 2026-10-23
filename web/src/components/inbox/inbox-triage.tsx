@@ -173,7 +173,7 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
       await notice.fn();
       setUndo((current) => current?.fn === notice.fn ? null : current);
     } catch (cause) {
-      const error = cause instanceof Error ? cause.message : "Could not undo this skip. Please try again.";
+      const error = cause instanceof Error ? cause.message : "无法撤销此次跳过，请重试。";
       setUndo((current) => current?.fn === notice.fn ? { ...current, busy: false, error } : current);
     } finally {
       undoRunning.current.delete(notice.fn);
@@ -190,10 +190,10 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
     const actions = createInboxSkipActions((done) => persistSkip(job.url, done), () => {
       setHidden((h) => h.filter((u) => u !== job.url));
       setUndo((current) => current?.fn === notice.fn && !current.busy ? null : current);
-      setWriteError(`Could not skip ${job.company}. Please try Skip again.`);
+      setWriteError(`无法跳过 ${job.company}，请重试。`);
     });
     const notice: UndoNotice = {
-      label: `Skipped ${job.company}`,
+      label: `已跳过 ${job.company}`,
       fn: async () => {
         await actions.undo();
         setHidden((h) => h.filter((u) => u !== job.url));
@@ -211,7 +211,7 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
     try {
       await Promise.all(urls.map((url) => persistSkip(url, false).then(() => {
         setHidden((h) => h.filter((u) => u !== url));
-      }).catch(() => setWriteError("Some jobs could not be restored. Try restore again."))));
+      }).catch(() => setWriteError("部分职位无法恢复，请重试。"))));
     } finally {
       restoreRunning.current = false;
       setRestoring(false);
@@ -240,7 +240,7 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
   const scoreShortlist = () => {
     const batchId = `shortlist-${Date.now()}`;
     for (const it of shortlist) {
-      startJob({ title: `Score · ${it.company}`, subtitle: it.role, kind: "evaluate", input: it.url, page: "/pipeline", batchId });
+      startJob({ title: `评分 · ${it.company}`, subtitle: it.role, kind: "evaluate", input: it.url, page: "/pipeline", batchId });
     }
     setShortlist([]); // sent — the rows flip to Scoring… → badge via scoreByUrl
   };
@@ -272,11 +272,11 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
       {/* batch header: fresh slice by default, or the full filtered set */}
       <div className="mt-4 flex items-baseline justify-between gap-3">
         <p className="text-sm font-medium text-foreground">
-          {capped ? "Fresh — worth a look" : anyFacet ? `${filtered.length} match${filtered.length === 1 ? "" : "es"}` : "All roles"}
+          {capped ? "新职位，值得看看" : anyFacet ? `${filtered.length} 个匹配` : "全部职位"}
         </p>
         {hiddenCount > 0 && (
           <button type="button" onClick={() => void restoreHidden()} disabled={restoring} aria-busy={restoring} className="text-xs text-faint transition-colors hover:text-foreground disabled:opacity-50 max-sm:min-h-[44px]">
-            {hiddenCount} hidden · {restoring ? "restoring…" : "restore"}
+            {hiddenCount} 个已隐藏 · {restoring ? "恢复中…" : "恢复"}
           </button>
         )}
       </div>
@@ -284,12 +284,12 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
       {/* multi-select action bar */}
       {selected.size > 0 && (
         <div className="mt-2 flex items-center gap-3 rounded-lg border border-brand/30 bg-brand-soft px-3 py-2 text-sm">
-          <span className="font-medium text-brand tabular-nums">{selected.size} selected</span>
+          <span className="font-medium text-brand tabular-nums">{selected.size} 项已选</span>
           <button type="button" onClick={saveSelected} className="rounded-md bg-brand px-2.5 py-1 text-xs font-medium text-brand-foreground max-sm:min-h-[44px]">
-            Save to shortlist
+            保存到候选清单
           </button>
           <button type="button" onClick={() => setSelected(new Set())} className="text-xs text-muted hover:text-foreground max-sm:min-h-[44px]">
-            Clear
+            清除
           </button>
         </div>
       )}
@@ -313,8 +313,8 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
         </ul>
       ) : (
         <div className="mt-3 rounded-2xl border border-dashed border-border bg-surface/30 px-6 py-10 text-center">
-          <p className="font-display text-lg">No matches</p>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-muted">Loosen the filters to see more of your inbox.</p>
+          <p className="font-display text-lg">没有匹配结果</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted">放宽筛选条件，查看更多待评估职位。</p>
         </div>
       )}
 
@@ -325,13 +325,13 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
           onClick={() => setShowAll(true)}
           className="mt-3 inline-flex w-full items-center justify-center gap-1 rounded-xl border border-border bg-surface/40 py-2.5 text-sm font-medium text-muted transition-colors hover:border-brand/40 hover:text-brand max-sm:min-h-[44px]"
         >
-          See all {ordered.length} in inbox →
+          查看全部 {ordered.length} 个待评估职位 →
         </button>
       )}
 
       {/* empty-shortlist guidance (only once there's nothing saved) */}
       {shortlist.length === 0 && (
-        <p className="mt-4 text-center text-xs text-faint">Save roles worth a look, then score them together — one token spend.</p>
+        <p className="mt-4 text-center text-xs text-faint">先保存值得关注的职位，再集中评分；评分会消耗 AI 用量。</p>
       )}
       </div>
 
@@ -344,7 +344,7 @@ export function InboxTriage({ inbox }: { inbox: InboxJob[] }) {
               {undo.error && <p role="alert" className="text-red-600 dark:text-red-400">{undo.error}</p>}
             </div>
             <button type="button" onClick={() => void handleUndo(undo)} disabled={undo.busy} aria-busy={Boolean(undo.busy)} className="inline-flex shrink-0 items-center gap-1 font-medium text-brand disabled:opacity-50 max-sm:min-h-[44px]">
-              <Undo2 className="size-3.5" /> {undo.busy ? "Undoing…" : undo.error ? "Retry undo" : "Undo"}
+              <Undo2 className="size-3.5" /> {undo.busy ? "撤销中…" : undo.error ? "重试撤销" : "撤销"}
             </button>
           </div>
         </div>

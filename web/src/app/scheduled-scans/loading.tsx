@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 // page on screen with no feedback.
 export default function ScheduledScansLoading() {
   return (
-    <div className="mx-auto max-w-5xl px-5 py-8" aria-label="Loading scheduled scans">
+    <div className="mx-auto max-w-5xl px-5 py-8" aria-label={"正在加载定时扫描"}>
       <Skeleton className="h-9 w-60" />
       <Skeleton className="mt-3 h-4 w-full max-w-lg" />
       <div className="mt-6 grid gap-3.5 sm:grid-cols-4">

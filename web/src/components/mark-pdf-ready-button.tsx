@@ -34,13 +34,13 @@ export function MarkPdfReadyButton({
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
-        setError(typeof body?.error === "string" ? body.error : "Could not mark the PDF ready.");
+        setError(typeof body?.error === "string" ? body.error : "无法将 PDF 标记为就绪。");
         return;
       }
       setMarked(true);
       router.refresh();
     } catch {
-      setError("Could not mark the PDF ready.");
+      setError("无法将 PDF 标记为就绪。");
     } finally {
       setBusy(false);
     }
@@ -59,7 +59,7 @@ export function MarkPdfReadyButton({
         }
       >
         {done && <Check className="size-3.5" />}
-        {busy ? "Saving…" : done ? "PDF ready" : "Mark PDF ready"}
+        {busy ? "正在保存…" : done ? "PDF 已就绪" : "将 PDF 标记为就绪"}
       </button>
       {error && <span className="text-xs text-red-500">{error}</span>}
     </span>

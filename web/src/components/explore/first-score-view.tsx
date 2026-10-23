@@ -32,7 +32,7 @@ function extractWhy(job: Job): string {
     .split(/\n{2,}/)
     .map((p) => p.replace(/[#*>`-]/g, "").replace(/\s+/g, " ").trim())
     .find((p) => p.length > 60 && /\b(you|your|fit|match|strong|experience|background)\b/i.test(p));
-  return para ? para.slice(0, 240) : "You're a strong match for this role — open the full report for the breakdown.";
+  return para ? para.slice(0, 240) : "你与此职位高度匹配，打开完整报告查看详细分析。";
 }
 
 export function FirstScoreView() {
@@ -114,18 +114,17 @@ export function FirstScoreView() {
   };
 
   return (
-    <div className="co-aha" role="dialog" aria-modal="true" aria-label="Your first score" onClick={close}>
+    <div className="co-aha" role="dialog" aria-modal="true" aria-label="你的首次评分" onClick={close}>
       <style>{STYLE}</style>
       <div ref={panelRef} className="co-aha__card" onClick={(e) => e.stopPropagation()}>
         <div className="co-aha__glow" />
-        <button onClick={close} aria-label="Close" className="absolute right-3 top-3 z-10 rounded-md p-1.5 text-faint transition hover:text-foreground">
+        <button onClick={close} aria-label="关闭" className="absolute right-3 top-3 z-10 rounded-md p-1.5 text-faint transition hover:text-foreground">
           <X className="size-4" />
         </button>
 
         <div className="relative px-7 pb-7 pt-8">
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-brand">
-            <span className="text-faint">//</span> the job we found you — scored
-          </p>
+            <span className="text-faint">//</span>{"找到的职位已完成评分"}</p>
 
           <div className="mt-4 flex items-start gap-4">
             <div className="min-w-0 flex-1">
@@ -142,7 +141,7 @@ export function FirstScoreView() {
                 >
                   {score}
                 </div>
-                <div className="text-[11px] uppercase tracking-wide text-faint">/ 5 fit</div>
+                <div className="text-[11px] uppercase tracking-wide text-faint">{"/ 5 匹配度"}</div>
               </div>
             )}
           </div>
@@ -159,13 +158,12 @@ export function FirstScoreView() {
                 legitimacyTone(legit) === "good" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
               )}
             >
-              <ShieldCheck className="size-3" /> Legitimacy: {legit}
+              <ShieldCheck className="size-3" />{"真实性："}{legit}
             </div>
           )}
 
           <p className="mt-5 flex items-center gap-1.5 text-[12px] text-faint">
-            <Coins className="size-3.5" /> That ran on your own AI. Everything before it — finding this job — was free.
-          </p>
+            <Coins className="size-3.5" />{"此次评分使用你自己的 AI。此前查找这个职位的过程是免费的。"}</p>
 
           <div className="mt-3 flex flex-wrap gap-2">
             <button
@@ -175,8 +173,7 @@ export function FirstScoreView() {
               }}
               className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-brand-foreground shadow-sm transition hover:brightness-110"
             >
-              <FileText className="size-4" /> See the full report
-            </button>
+              <FileText className="size-4" />{"查看完整报告"}</button>
             <button
               onClick={() => {
                 close();
@@ -184,8 +181,7 @@ export function FirstScoreView() {
               }}
               className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface/50 px-4 py-2.5 text-sm font-medium text-foreground transition hover:border-brand/40 hover:text-brand"
             >
-              <Compass className="size-4" /> Find more like this
-            </button>
+              <Compass className="size-4" />{"查找相似职位"}</button>
           </div>
         </div>
       </div>

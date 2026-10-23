@@ -23,15 +23,13 @@ export function WorkerPills() {
   return (
     <div className="mt-4 border-t border-border pt-3">
       <div className="mb-2 flex items-center gap-2 px-1">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-faint">Workers</span>
-        {running > 0 && <span className="text-[10px] tabular-nums text-brand">{running} running</span>}
-        <Link href="/jobs" className="ml-auto text-faint transition-colors hover:text-foreground" title="History" aria-label="Worker history">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-faint">{"任务"}</span>
+        {running > 0 && <span className="text-[10px] tabular-nums text-brand">{running}{"运行中"}</span>}
+        <Link href="/jobs" className="ml-auto text-faint transition-colors hover:text-foreground" title="历史" aria-label="任务历史">
           <History className="size-3.5" />
         </Link>
         {finished > 0 && (
-          <button onClick={clearFinished} className="text-[10px] text-faint transition-colors hover:text-foreground" title="Clear finished">
-            clear
-          </button>
+          <button onClick={clearFinished} className="text-[10px] text-faint transition-colors hover:text-foreground" title="清除已完成">{"清除"}</button>
         )}
       </div>
       <ul className="space-y-1.5">
@@ -52,7 +50,7 @@ export function WorkerPills() {
               <button
                 onClick={() => removeJob(j.id)}
                 className="absolute right-2 top-2 rounded text-faint opacity-100 [@media(hover:hover)]:opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-                aria-label={`Dismiss worker: ${workerIdentity(j)}`}
+                aria-label={`关闭任务提示：${workerIdentity(j)}`}
               >
                 <X className="size-3" />
               </button>

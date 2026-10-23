@@ -74,8 +74,7 @@ export function SkillGaps() {
       <section className="mt-8 rounded-2xl border border-border bg-surface/40 px-5 py-4">
         <Header />
         <p className="mt-2 text-sm text-muted">
-          No recurring gaps yet. These are read from each report&apos;s Machine Summary and Gap table, so they appear
-          once a few evaluations are in.
+          尚未发现反复出现的短板。这些内容来自各报告的机器摘要和差距表，积累几份评估后才会显示。
         </p>
         {/* The caveats belong here too. "No gaps" read off a CV whose skills
             could not be recognised, or off a fraction of the reports, is the
@@ -105,17 +104,16 @@ export function SkillGaps() {
               {g.tier ?? "—"}
             </span>
             <span className="w-24 shrink-0 text-right text-xs tabular-nums text-faint">
-              {g.reports} report{g.reports === 1 ? "" : "s"}
+              {g.reports} 份报告
             </span>
           </div>
         ))}
       </div>
 
       <p className="mt-4 text-xs text-faint">
-        Weighted by fit — a low-scoring role says more about a gap than a high-scoring one. Nothing here is added to your
-        CV; close the gap first, then write it.{" "}
+        按匹配度加权：低评分职位对短板的反映通常更明显。这里的内容不会自动加入简历；请先弥补短板，再写入简历。{" "}
         <Link href="/pipeline" className="text-muted underline-offset-2 hover:underline">
-          See the reports
+          查看报告
         </Link>
       </p>
 
@@ -128,8 +126,8 @@ function SkipBlockers({ blockers, skips }: { blockers: SkillGapModel["blockers"]
   if (blockers.length === 0) return null;
   return (
     <div className="mt-5 border-t border-border pt-4">
-      <h3 className="text-sm text-foreground">What blocked your last {skips} skips</h3>
-      <p className="mt-0.5 text-xs text-faint">Critical or high requirements the evaluator marked missing or partial.</p>
+      <h3 className="text-sm text-foreground">最近被哪些因素阻挡 {skips} 次跳过</h3>
+      <p className="mt-0.5 text-xs text-faint">评估中被标记为缺失或仅部分满足的关键或高优先级要求。</p>
       <ul className="mt-3 grid gap-3">
         {blockers.map((b) => {
           const { verdict, nudge } = blockerText(b);
@@ -138,7 +136,7 @@ function SkipBlockers({ blockers, skips }: { blockers: SkillGapModel["blockers"]
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span className="text-sm text-foreground">{b.label}</span>
                 <span className="text-xs tabular-nums text-brand-text">
-                  {b.skips} of {skips}
+                  {b.skips}／{skips}
                 </span>
                 <span className="text-xs text-muted">{verdict}</span>
                 <span className="ml-auto flex gap-2 text-xs tabular-nums text-faint">
@@ -176,8 +174,8 @@ function Header() {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <GraduationCap className="size-4 text-brand" />
-      <h2 className="font-display text-base text-landing">What keeps costing you roles</h2>
-      <span className="text-xs text-faint">across your tracked evaluations</span>
+      <h2 className="font-display text-base text-landing">哪些短板反复影响求职</h2>
+      <span className="text-xs text-faint">基于已跟踪的评估</span>
     </div>
   );
 }

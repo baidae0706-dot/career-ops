@@ -19,10 +19,10 @@ type Section = { id: string; heading: string; state: "filled" | "template" | "mi
 // modes/_profile.md has no `ask` of its own: when it is absent its eight
 // sections are all "missing", and the personalization line below asks for them.
 const PREREQS: { key: string; label: string; ask?: string }[] = [
-  { key: "cv.md", label: "Your CV", ask: "my CV" },
-  { key: "config/profile.yml", label: "Profile — target roles, comp, location", ask: "my profile (target roles, comp, location)" },
-  { key: "modes/_profile.md", label: "Personalization file" },
-  { key: "portals.yml", label: "Companies and roles to scan", ask: "the roles and companies to scan" },
+  { key: "cv.md", label: "你的简历", ask: "my CV" },
+  { key: "config/profile.yml", label: "求职资料：目标岗位、薪酬、地点", ask: "my profile (target roles, comp, location)" },
+  { key: "modes/_profile.md", label: "个性化设置文件" },
+  { key: "portals.yml", label: "要扫描的公司与职位", ask: "the roles and companies to scan" },
 ];
 
 // Same reader the rest of the app uses, so "configured" cannot mean one thing
@@ -72,9 +72,9 @@ export function OnboardingProgress({ compact = false }: { compact?: boolean }) {
   const kickoff = `Let's finish setting me up. Still to do: ${asks.join("; ")}. Walk me through it like a recruiter building my brief — one or two things at a time, propose what you infer from my CV, and let me confirm each piece. Don't ask for anything already on file.`;
 
   return (
-    <aside className={`rounded-2xl border border-border bg-surface/40 ${compact ? "p-4" : "p-5"}`} aria-label="Setup progress">
+    <aside className={`rounded-2xl border border-border bg-surface/40 ${compact ? "p-4" : "p-5"}`} aria-label="设置进度">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-sm font-medium text-foreground">Your profile, as it takes shape</h2>
+        <h2 className="text-sm font-medium text-foreground">逐步完善你的求职资料</h2>
         <span className="font-mono text-xs text-muted">{done}/{total}</span>
       </div>
       <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-surface-hover">
@@ -85,7 +85,7 @@ export function OnboardingProgress({ compact = false }: { compact?: boolean }) {
         {PREREQS.map((p) => (
           <Row key={p.key} state={missing.has(p.key) ? "missing" : "filled"} label={p.label} />
         ))}
-        <li className="pt-2 font-mono text-[10px] uppercase tracking-[0.18em] text-faint">personalization — what evaluations score against</li>
+        <li className="pt-2 font-mono text-[10px] uppercase tracking-[0.18em] text-faint">个性化设置：评估时使用的目标与标准</li>
         {sections.map((s) => (
           <Row key={s.id} state={s.state} label={s.heading.replace(/^## Your /, "")} />
         ))}
@@ -96,11 +96,11 @@ export function OnboardingProgress({ compact = false }: { compact?: boolean }) {
           onClick={() => window.dispatchEvent(new CustomEvent("co-assistant", { detail: { message: kickoff } }))}
           className="mt-4 inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition-colors hover:bg-brand-200"
         >
-          <Sparkles className="size-4" /> Continue with the assistant
+          <Sparkles className="size-4" /> 让助手继续设置
         </button>
       ) : (
         <p className="mt-4 text-xs text-muted">
-          Connect your AI CLI in <a href="/config" className="text-foreground underline-offset-2 hover:underline">Config</a> and the assistant fills this in with you.
+          请先在 <a href="/config" className="text-foreground underline-offset-2 hover:underline">设置</a> 中连接 AI CLI，助手会与你一起完善资料。
         </p>
       )}
     </aside>
@@ -110,7 +110,7 @@ export function OnboardingProgress({ compact = false }: { compact?: boolean }) {
 function Row({ state, label }: { state: "filled" | "template" | "missing"; label: string }) {
   const Icon = state === "filled" ? Check : state === "template" ? CircleDashed : Circle;
   const tone = state === "filled" ? "text-foreground" : "text-muted";
-  const hint = state === "template" ? "still the example" : state === "missing" ? "not yet" : "";
+  const hint = state === "template" ? "仍为示例" : state === "missing" ? "尚未设置" : "";
   return (
     <li className={`flex items-center gap-2 ${tone}`}>
       <Icon className={`size-3.5 shrink-0 ${state === "filled" ? "text-brand" : "text-faint"}`} aria-hidden />

@@ -1,5 +1,7 @@
 "use client";
 
+import { uiLabel } from "@/lib/ui-labels";
+
 import { useMemo, useState } from "react";
 import { ExternalLink, Plus, Check, Loader2, ShieldQuestion, Sparkles, Coins } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -12,7 +14,7 @@ import { useExplore } from "./explore-provider";
 function freshness(postedAt: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(postedAt)) return "";
   const days = Math.max(0, Math.round((Date.now() - new Date(postedAt + "T00:00:00Z").getTime()) / 86_400_000));
-  return days === 0 ? "today" : days === 1 ? "1d ago" : `${days}d ago`;
+  return days === 0 ? "今天" : days === 1 ? "1 天前" : `${days} 天前`;
 }
 
 // Real company logo (favicon) via the localhost proxy, cached on disk FOREVER per
@@ -37,7 +39,7 @@ function Logo({ company }: { company: string }) {
 }
 
 // What a running worker is doing on this exact posting → the live CTA label.
-const WORKER_LABEL: Record<string, string> = { evaluate: "Evaluating…", pdf: "Preparing CV…", research: "Researching…", apply: "Filling…" };
+const WORKER_LABEL: Record<string, string> = { evaluate: "评估中…", pdf: "正在准备简历…", research: "调研中…", apply: "填写中…" };
 
 export function DiscoveryCard({ offer, inPipeline, evaluatedN }: { offer: DiscoveredOffer; inPipeline: boolean; evaluatedN?: string }) {
   const { added, adding, addToPipeline } = useExplore();
@@ -51,7 +53,7 @@ export function DiscoveryCard({ offer, inPipeline, evaluatedN }: { offer: Discov
   );
   const working = job?.status === "running";
   const doneEval = job?.status === "done" && job.kind === "evaluate";
-  const statusLabel = WORKER_LABEL[job?.kind ?? ""] ?? "Working…";
+  const statusLabel = WORKER_LABEL[job?.kind ?? ""] ?? "处理中…";
 
   const isAdded = added.has(offer.url) || inPipeline || working || doneEval;
   const isAdding = adding.has(offer.url);
@@ -61,7 +63,7 @@ export function DiscoveryCard({ offer, inPipeline, evaluatedN }: { offer: Discov
 
   const evaluate = () => {
     addToPipeline([offer]); // evaluating implies it's in the pipeline — record it
-    startJob({ title: `Evaluate · ${offer.company}`, subtitle: offer.title, kind: "evaluate", input: offer.url, page: "/explore" });
+    startJob({ title: `评估 · ${offer.company}`, subtitle: offer.title, kind: "evaluate", input: offer.url, page: "/explore" });
   };
 
   return (
@@ -72,15 +74,15 @@ export function DiscoveryCard({ offer, inPipeline, evaluatedN }: { offer: Discov
           <h3 className={`${instrumentSerif.className} truncate text-[17px] leading-tight text-foreground transition-colors group-hover:text-brand`}>{offer.title}</h3>
           <p className="mt-0.5 truncate text-[13px] text-muted">
             {offer.company}
-            {(offer.location || employer) && <span className="text-faint"> · {offer.location || "Location unknown"}</span>}
+            {(offer.location || employer) && <span className="text-faint"> · {offer.location || "地点未知"}</span>}
           </p>
         </a>
         <a
           href={offer.url}
           target="_blank"
           rel="noopener noreferrer"
-          title="Open the posting"
-          aria-label="Open the posting"
+          title="打开职位页面"
+          aria-label="打开职位页面"
           className="-m-1 inline-flex shrink-0 items-center justify-center rounded p-1 text-faint transition-colors hover:text-foreground max-sm:min-h-[44px] max-sm:min-w-[44px]"
         >
           <ExternalLink className="size-4" />
@@ -89,18 +91,16 @@ export function DiscoveryCard({ offer, inPipeline, evaluatedN }: { offer: Discov
 
       <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
         <span className="rounded border border-border px-1.5 py-0.5 font-medium text-muted">{ATS_LABEL[offer.ats as AtsSource] ?? EMPLOYER_LABEL[offer.ats as keyof typeof EMPLOYER_LABEL] ?? offer.ats}</span>
-        {(fresh || employer) && <span className="text-faint">{fresh || "Posting date unknown"}</span>}
+        {(fresh || employer) && <span className="text-faint">{fresh || "发布时间未知"}</span>}
         {unverified && (
           <span
             className="inline-flex items-center gap-1 rounded border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 font-medium text-amber-600 dark:text-amber-300"
-            title="Found by AI on the public web — we can't confirm it's still live without opening it. Evaluating runs a real browser check and sets the verdict."
+            title="AI 在公开网络上找到此职位，尚未打开页面，无法确认仍有效。评估会执行真实浏览器检查并给出结论。"
           >
-            <ShieldQuestion className="size-3" /> unverified
-          </span>
+            <ShieldQuestion className="size-3" />{"未验证"}</span>
         )}
         {offer.matchedKeyword && (
-          <span className="text-faint" title="Keyword match — not yet scored. Evaluate to get an A–F fit score.">
-            · matched <span className="text-brand/80">{offer.matchedKeyword}</span>
+          <span className="text-faint" title="仅为关键词匹配，尚未评分。评估后可获得 A–F 匹配等级。">{"· 匹配"}<span className="text-brand/80">{offer.matchedKeyword}</span>
           </span>
         )}
         {offer.fit && (
@@ -111,10 +111,9 @@ export function DiscoveryCard({ offer, inPipeline, evaluatedN }: { offer: Discov
                 ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                 : "text-faint",
             )}
-            title="Free keyword-level estimate: posting title vs your profile's target roles (config/profile.yml). Not an evaluation — Evaluate still gives the real A–F fit score."
+            title="免费关键词预估：比较职位名称与你的目标岗位（config/profile.yml）。这不是正式评估，点击“评估”后才能获得真实的 A–F 匹配等级。"
           >
-            · {offer.fit.band} fit
-          </span>
+            · {uiLabel(offer.fit.band)}{"匹配度"}</span>
         )}
       </div>
 
@@ -131,13 +130,12 @@ export function DiscoveryCard({ offer, inPipeline, evaluatedN }: { offer: Discov
             href={evaluatedN ? `/pipeline/${evaluatedN}` : job ? `/jobs/${job.id}` : "/pipeline"}
             className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-brand-soft px-2.5 py-2 text-xs font-medium text-brand max-sm:min-h-[44px]"
           >
-            <Check className="size-3.5" /> Evaluated · view report
-          </a>
+            <Check className="size-3.5" />{"已评估 · 查看报告"}</a>
         ) : working ? (
           <div className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-brand/30 bg-brand-soft/60 px-2.5 py-2 text-xs font-medium text-brand">
             <Loader2 className="size-3.5 animate-spin" />
             {statusLabel}
-            <span className="text-brand/60">· in pipeline</span>
+            <span className="text-brand/60">{"· 已记录"}</span>
           </div>
         ) : (
           <div className="flex items-center gap-2">
@@ -151,15 +149,14 @@ export function DiscoveryCard({ offer, inPipeline, evaluatedN }: { offer: Discov
               )}
             >
               {isAdding ? <Loader2 className="size-3.5 animate-spin" /> : isAdded ? <Check className="size-3.5" /> : <Plus className="size-3.5" />}
-              {isAdded ? "In pipeline" : "Add to pipeline"}
+              {isAdded ? "已在求职进展中" : "加入求职进展"}
             </button>
             <button
               type="button"
               onClick={evaluate}
-              title={unverified ? "Runs a real evaluation — and verifies the posting is live. Uses tokens." : "Runs a real A–F evaluation. Uses tokens."}
+              title={unverified ? "执行正式评估并验证职位是否有效，会消耗 Token。" : "执行正式 A–F 评估，会消耗 Token。"}
               className="inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-brand/30 px-2.5 py-2 text-xs font-medium text-brand transition-colors hover:bg-brand-soft max-sm:min-h-[44px]"
-            >
-              Evaluate <Coins className="size-3.5 opacity-80" />
+            >{"评估"}<Coins className="size-3.5 opacity-80" />
             </button>
           </div>
         )}

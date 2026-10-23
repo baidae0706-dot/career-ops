@@ -54,7 +54,7 @@ test("the confirm card shows the text exactly as it will be saved", () => {
   result.run();
   assert.equal(remembered[0].length, 300);
   assert.ok(remembered[0].startsWith("Prefers remote-first teams "));
-  assert.ok(result.summary.includes(`"${remembered[0]}"`), "the card and the saved text differ");
+  assert.ok(result.summary.includes(`「${remembered[0]}」`), "the card and the saved text differ");
 });
 
 test("remember with only whitespace is ignored and saves nothing", () => {

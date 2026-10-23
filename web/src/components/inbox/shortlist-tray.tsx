@@ -51,7 +51,7 @@ export function ShortlistTray({
                   <button
                     type="button"
                     onClick={() => onRemove(it.url)}
-                    aria-label={`Remove ${it.company}`}
+                    aria-label={`移除 ${it.company}`}
                     className="inline-flex items-center justify-center rounded-md p-1 text-faint transition-colors hover:text-foreground max-sm:min-h-[44px] max-sm:min-w-[44px]"
                   >
                     <X className="size-4" />
@@ -68,14 +68,11 @@ export function ShortlistTray({
               onClick={() => setOpen((v) => !v)}
               className="inline-flex items-center gap-1.5 text-sm font-medium max-sm:min-h-[44px]"
             >
-              <ChevronDown className={cn("size-4 text-muted transition-transform", open && "rotate-180")} />
-              Shortlist <span className="tabular-nums text-brand-text">({n})</span>
+              <ChevronDown className={cn("size-4 text-muted transition-transform", open && "rotate-180")} />{"候选清单"}<span className="tabular-nums text-brand-text">({n})</span>
             </button>
 
             {open && (
-              <button type="button" onClick={onClear} className="text-xs text-faint transition-colors hover:text-foreground max-sm:min-h-[44px]">
-                Clear
-              </button>
+              <button type="button" onClick={onClear} className="text-xs text-faint transition-colors hover:text-foreground max-sm:min-h-[44px]">{"清除"}</button>
             )}
 
             <div className="ml-auto flex items-center gap-2">
@@ -86,7 +83,7 @@ export function ShortlistTray({
                   className="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition-colors hover:bg-brand-200 max-sm:min-h-[44px]"
                 >
                   <Sparkles className="size-4" />
-                  <span>Score {n}</span>
+                  <span>{"评分"}{n}</span>
                   <span className="hidden text-xs font-normal text-brand-foreground/80 sm:inline">· {costText}</span>
                 </button>
               ) : (
@@ -98,7 +95,7 @@ export function ShortlistTray({
           {/* cost line — always visible on mobile (where it doesn't fit in the button) */}
           <div className="flex items-center gap-2 border-t border-border/60 px-3 py-1.5 text-[11px] text-muted sm:hidden">
             <CostBadge kind="spend" size="xs" />
-            <span>{costText} — the only step that spends</span>
+            <span>{costText}{"— 唯一消耗 AI 用量的步骤"}</span>
           </div>
         </div>
       </div>
@@ -122,13 +119,10 @@ function ConfirmScore({
   if (!hasCli) {
     return (
       <div className="flex items-center gap-2 text-xs">
-        <span className="text-muted">No AI configured.</span>
+        <span className="text-muted">{"尚未配置 AI。"}</span>
         <Link href="/config" className="inline-flex items-center gap-1 rounded-full border border-brand/40 bg-brand-soft px-3 py-1.5 font-medium text-brand max-sm:min-h-[44px]">
-          <Settings className="size-3.5" /> Set up
-        </Link>
-        <button type="button" onClick={onCancel} className="text-faint hover:text-foreground max-sm:min-h-[44px]">
-          Cancel
-        </button>
+          <Settings className="size-3.5" />{"设置"}</Link>
+        <button type="button" onClick={onCancel} className="text-faint hover:text-foreground max-sm:min-h-[44px]">{"取消"}</button>
       </div>
     );
   }
@@ -141,12 +135,8 @@ function ConfirmScore({
         type="button"
         onClick={onConfirm}
         className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition-colors hover:bg-brand-200 max-sm:min-h-[44px]"
-      >
-        Score {n} now
-      </button>
-      <button type="button" onClick={onCancel} className="rounded-full px-2 py-2 text-xs text-faint transition-colors hover:text-foreground max-sm:min-h-[44px]">
-        Cancel
-      </button>
+      >{"评分"}{n}{"现在"}</button>
+      <button type="button" onClick={onCancel} className="rounded-full px-2 py-2 text-xs text-faint transition-colors hover:text-foreground max-sm:min-h-[44px]">{"取消"}</button>
     </div>
   );
 }
